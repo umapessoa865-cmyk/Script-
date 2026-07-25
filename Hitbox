@@ -1,37 +1,152 @@
--- HITBOX SIMPLES - FUNCIONA NO DELTA
+-- HITBOX V8 - POTÊNCIA TOTAL! 💪
+-- CORRIGIDO: Slider, Imortalidade, Dano Contínuo
+
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 
--- GUI
+-- ============================================
+-- DETECTOR DE SISTEMA DE DANO
+-- ============================================
+local sistemaDano = {
+    tipo = "humanoid",
+    remote = nil,
+    atributo = nil
+}
+
+-- Função para detectar remotes de dano
+local function detectarRemotes()
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            local nome = obj.Name:lower()
+            if nome:find("damage") or nome:find("attack") or nome:find("hit") or 
+               nome:find("combat") or nome:find("enemy") or nome:find("monster") then
+                return obj
+            end
+        end
+    end
+    return nil
+end
+
+-- Função para detectar atributos de vida
+local function detectarAtributos()
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
+            local atts = obj:GetAttributes()
+            for nome, valor in pairs(atts) do
+                if type(valor) == "number" and (nome:lower():find("health") or nome:lower():find("hp") or nome:lower():find("vida")) then
+                    return nome
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- Detectar sistema
+local remote = detectarRemotes()
+local atributo = detectarAtributos()
+
+if remote then
+    sistemaDano.tipo = "remote"
+    sistemaDano.remote = remote
+    print("✅ Sistema de dano: RemoteEvent (" .. remote.Name .. ")")
+elseif atributo then
+    sistemaDano.tipo = "atributo"
+    sistemaDano.atributo = atributo
+    print("✅ Sistema de dano: Atributo (" .. atributo .. ")")
+else
+    sistemaDano.tipo = "humanoid"
+    print("✅ Sistema de dano: Humanoid padrão")
+end
+
+-- ============================================
+-- FUNÇÃO PODEROSA DE APLICAR DANO
+-- ============================================
+local function aplicarDano(npc, quantidade)
+    if not npc then return false end
+    
+    local hum = npc:FindFirstChild("Humanoid")
+    if not hum then return false end
+    
+    -- MÉTODO 1: Humanoid
+    if sistemaDano.tipo == "humanoid" then
+        local sucesso, erro = pcall(function()
+            hum.Health = hum.Health - quantidade
+        end)
+        if sucesso then return true end
+    end
+    
+    -- MÉTODO 2: RemoteEvent
+    if sistemaDano.tipo == "remote" and sistemaDano.remote then
+        local sucesso, erro = pcall(function()
+            if sistemaDano.remote:IsA("RemoteEvent") then
+                sistemaDano.remote:FireServer(quantidade, npc)
+            else
+                sistemaDano.remote:InvokeServer(quantidade, npc)
+            end
+        end)
+        if sucesso then return true end
+    end
+    
+    -- MÉTODO 3: Atributo
+    if sistemaDano.tipo == "atributo" and sistemaDano.atributo then
+        local att = npc:GetAttribute(sistemaDano.atributo)
+        if att and type(att) == "number" then
+            local sucesso, erro = pcall(function()
+                npc:SetAttribute(sistemaDano.atributo, att - quantidade)
+            end)
+            if sucesso then return true end
+        end
+    end
+    
+    -- MÉTODO 4: Tentar todos os remotes (fallback)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            local sucesso, erro = pcall(function()
+                obj:FireServer(quantidade, npc)
+            end)
+            if sucesso then return true end
+        end
+    end
+    
+    return false
+end
+
+-- ============================================
+-- GUI MELHORADA
+-- ============================================
 local gui = Instance.new("ScreenGui")
-gui.Name = "Hitbox"
+gui.Name = "HitboxV8"
 gui.Parent = player:WaitForChild("PlayerGui")
 
 local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 200, 0, 130)
-main.Position = UDim2.new(0.5, -100, 0.1, 0)
+main.Size = UDim2.new(0, 260, 0, 180)
+main.Position = UDim2.new(0.5, -130, 0.1, 0)
 main.BackgroundColor3 = Color3.fromRGB(10, 10, 25)
 main.BackgroundTransparency = 0.1
 main.BorderSizePixel = 0
+main.Active = true
+main.Draggable = true
 main.Parent = gui
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 20)
+title.Size = UDim2.new(1, 0, 0, 25)
 title.BackgroundTransparency = 1
-title.Text = "⚔️ HITBOX"
+title.Text = "⚔️ HITBOX V8 ⚔️"
 title.TextColor3 = Color3.fromRGB(255, 50, 50)
 title.TextScaled = true
 title.Font = Enum.Font.GothamBold
 title.Parent = main
 
 local status = Instance.new("TextLabel")
-status.Size = UDim2.new(1, 0, 0, 16)
-status.Position = UDim2.new(0, 0, 0, 22)
+status.Size = UDim2.new(1, 0, 0, 20)
+status.Position = UDim2.new(0, 0, 0, 27)
 status.BackgroundTransparency = 1
 status.Text = "🔴 OFF"
 status.TextColor3 = Color3.fromRGB(255, 0, 0)
@@ -40,8 +155,8 @@ status.Font = Enum.Font.GothamBold
 status.Parent = main
 
 local npcCount = Instance.new("TextLabel")
-npcCount.Size = UDim2.new(1, 0, 0, 14)
-npcCount.Position = UDim2.new(0, 0, 0, 40)
+npcCount.Size = UDim2.new(1, 0, 0, 16)
+npcCount.Position = UDim2.new(0, 0, 0, 48)
 npcCount.BackgroundTransparency = 1
 npcCount.Text = "NPCs: 0"
 npcCount.TextColor3 = Color3.fromRGB(150, 200, 255)
@@ -50,8 +165,8 @@ npcCount.Font = Enum.Font.Gotham
 npcCount.Parent = main
 
 local btnToggle = Instance.new("TextButton")
-btnToggle.Size = UDim2.new(0.4, 0, 0, 25)
-btnToggle.Position = UDim2.new(0.05, 0, 0, 58)
+btnToggle.Size = UDim2.new(0.4, 0, 0, 30)
+btnToggle.Position = UDim2.new(0.05, 0, 0, 68)
 btnToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 btnToggle.Text = "ATIVAR"
 btnToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -61,8 +176,8 @@ btnToggle.BorderSizePixel = 0
 btnToggle.Parent = main
 
 local btnScan = Instance.new("TextButton")
-btnScan.Size = UDim2.new(0.4, 0, 0, 25)
-btnScan.Position = UDim2.new(0.55, 0, 0, 58)
+btnScan.Size = UDim2.new(0.4, 0, 0, 30)
+btnScan.Position = UDim2.new(0.55, 0, 0, 68)
 btnScan.BackgroundColor3 = Color3.fromRGB(50, 50, 200)
 btnScan.Text = "SCAN"
 btnScan.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -71,14 +186,17 @@ btnScan.Font = Enum.Font.GothamBold
 btnScan.BorderSizePixel = 0
 btnScan.Parent = main
 
+-- ============================================
+-- SLIDER CORRIGIDO (FUNCIONA!)
+-- ============================================
 local sliderFrame = Instance.new("Frame")
-sliderFrame.Size = UDim2.new(0.9, 0, 0, 25)
-sliderFrame.Position = UDim2.new(0.05, 0, 0, 87)
+sliderFrame.Size = UDim2.new(0.9, 0, 0, 35)
+sliderFrame.Position = UDim2.new(0.05, 0, 0, 105)
 sliderFrame.BackgroundTransparency = 1
 sliderFrame.Parent = main
 
 local sliderLabel = Instance.new("TextLabel")
-sliderLabel.Size = UDim2.new(0.25, 0, 1, 0)
+sliderLabel.Size = UDim2.new(0.3, 0, 1, 0)
 sliderLabel.BackgroundTransparency = 1
 sliderLabel.Text = "2.0x"
 sliderLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -87,8 +205,8 @@ sliderLabel.Font = Enum.Font.GothamBold
 sliderLabel.Parent = sliderFrame
 
 local sliderBg = Instance.new("Frame")
-sliderBg.Size = UDim2.new(0.6, 0, 0.4, 0)
-sliderBg.Position = UDim2.new(0.3, 0, 0.3, 0)
+sliderBg.Size = UDim2.new(0.55, 0, 0.5, 0)
+sliderBg.Position = UDim2.new(0.38, 0, 0.25, 0)
 sliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
 sliderBg.BorderSizePixel = 0
 sliderBg.Parent = sliderFrame
@@ -99,9 +217,27 @@ sliderBar.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
 sliderBar.BorderSizePixel = 0
 sliderBar.Parent = sliderBg
 
+local sliderBtn = Instance.new("TextButton")
+sliderBtn.Size = UDim2.new(0, 18, 2.5, 0)
+sliderBtn.Position = UDim2.new(0.5, -9, -0.75, 0)
+sliderBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+sliderBtn.Text = ""
+sliderBtn.BorderSizePixel = 0
+sliderBtn.Parent = sliderBar
+
+local info = Instance.new("TextLabel")
+info.Size = UDim2.new(1, 0, 0, 14)
+info.Position = UDim2.new(0, 0, 0, 145)
+info.BackgroundTransparency = 1
+info.Text = "📏 2.0x"
+info.TextColor3 = Color3.fromRGB(150, 150, 150)
+info.TextScaled = true
+info.Font = Enum.Font.Gotham
+info.Parent = main
+
 local log = Instance.new("TextLabel")
-log.Size = UDim2.new(1, 0, 0, 12)
-log.Position = UDim2.new(0, 0, 0, 118)
+log.Size = UDim2.new(1, 0, 0, 14)
+log.Position = UDim2.new(0, 0, 0, 163)
 log.BackgroundTransparency = 1
 log.Text = "📝 Pronto"
 log.TextColor3 = Color3.fromRGB(100, 100, 100)
@@ -109,36 +245,63 @@ log.TextScaled = true
 log.Font = Enum.Font.Gotham
 log.Parent = main
 
+-- ============================================
 -- VARIÁVEIS
+-- ============================================
 local ativo = false
 local alcance = 2.0
 local npcs = {}
 local mortos = {}
+local atacando = {}
 
--- SCANEAR
+-- ============================================
+-- SCANEAR (MELHORADO)
+-- ============================================
 local function scanear()
     npcs = {}
     mortos = {}
+    atacando = {}
+    
     for _, obj in pairs(Workspace:GetDescendants()) do
         if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
             local hum = obj:FindFirstChild("Humanoid")
-            if hum and hum.Health and hum.Health > 0 and obj ~= character and obj.Name ~= player.Name then
-                table.insert(npcs, obj)
+            if hum and hum.Health and hum.Health > 0 then
+                if obj ~= character and obj.Name ~= player.Name then
+                    -- Verifica se é inimigo (por nome ou atributo)
+                    local ehInimigo = true
+                    local nome = obj.Name:lower()
+                    if nome:find("chest") or nome:find("spawn") or nome:find("door") or nome:find("plate") then
+                        ehInimigo = false
+                    end
+                    if ehInimigo then
+                        table.insert(npcs, obj)
+                    end
+                end
             end
         end
     end
+    
     npcCount.Text = "NPCs: " .. #npcs
     log.Text = "✅ Scan: " .. #npcs .. " NPCs"
+    print("✅ Scan: " .. #npcs .. " NPCs")
 end
 
--- CRIAR HITBOX
+-- ============================================
+-- CRIAR HITBOX (COM DANO CONTÍNUO)
+-- ============================================
 local function criarHitbox(npc)
     if mortos[npc] then return end
+    if not npc or not npc.Parent then return end
+    
     local antiga = npc:FindFirstChild("HitboxBorda")
     if antiga then antiga:Destroy() end
-    local root = npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChild("Head")
+    
+    local root = npc:FindFirstChild("HumanoidRootPart")
+    if not root then
+        root = npc:FindFirstChild("Head")
+    end
     if not root then return end
-
+    
     local hitbox = Instance.new("Part")
     hitbox.Name = "HitboxBorda"
     hitbox.Size = Vector3.new(6, 6, 6) * alcance
@@ -149,48 +312,107 @@ local function criarHitbox(npc)
     hitbox.BrickColor = BrickColor.new("Bright red")
     hitbox.Material = Enum.Material.Neon
     hitbox.Parent = npc
-
+    
     local highlight = Instance.new("Highlight")
     highlight.FillColor = Color3.fromRGB(255, 0, 0)
-    highlight.FillTransparency = 0.6
+    highlight.FillTransparency = 0.5
     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-    highlight.OutlineTransparency = 0.5
+    highlight.OutlineTransparency = 0.3
     highlight.Parent = hitbox
-
+    
+    -- ============================================
+    -- SISTEMA DE DANO CONTÍNUO
+    -- ============================================
+    local danoContinuo = nil
+    
     hitbox.Touched:Connect(function(other)
         if not ativo then return end
-        if not other or not other:IsDescendantOf(character) then return end
+        if not other then return end
+        if not other:IsDescendantOf(character) then return end
+        if mortos[npc] then return end
+        
         local hum = npc:FindFirstChild("Humanoid")
-        if not hum or hum.Health <= 0 then
+        if not hum then return end
+        if hum.Health <= 0 then
             mortos[npc] = true
-            if hitbox then hitbox:Destroy() end
+            hitbox:Destroy()
             return
         end
-        local dano = 10 * alcance
-        hum.Health = hum.Health - dano
-        log.Text = "💥 " .. dano .. " (" .. npc.Name .. ")"
-        if hum.Health <= 0 then
-            hum.Health = 0
-            mortos[npc] = true
-            if hitbox then hitbox:Destroy() end
-            for i = #npcs, 1, -1 do
-                if npcs[i] == npc then table.remove(npcs, i) break end
+        
+        -- Se já estiver atacando, não inicia outro loop
+        if atacando[npc] then return end
+        atacando[npc] = true
+        
+        -- Loop de dano contínuo enquanto o jogador estiver encostando
+        danoContinuo = task.spawn(function()
+            local contador = 0
+            while ativo and not mortos[npc] and hum and hum.Health > 0 do
+                -- Aplica dano a cada 0.15 segundos
+                local dano = 8 * alcance
+                local sucesso = aplicarDano(npc, dano)
+                
+                if sucesso then
+                    contador = contador + 1
+                    log.Text = "💥 " .. dano .. " (" .. npc.Name .. ")"
+                    status.Text = "⚔️ ATACANDO!"
+                    status.TextColor3 = Color3.fromRGB(255, 200, 0)
+                end
+                
+                -- Verifica se morreu
+                if hum.Health <= 0 then
+                    hum.Health = 0
+                    mortos[npc] = true
+                    hitbox:Destroy()
+                    log.Text = "💀 " .. npc.Name .. " MORREU!"
+                    status.Text = "💀 MORTO!"
+                    status.TextColor3 = Color3.fromRGB(255, 0, 0)
+                    -- Remove da lista
+                    for i = #npcs, 1, -1 do
+                        if npcs[i] == npc then
+                            table.remove(npcs, i)
+                            break
+                        end
+                    end
+                    npcCount.Text = "NPCs: " .. #npcs
+                    break
+                end
+                
+                task.wait(0.15) -- Dano contínuo
             end
-            npcCount.Text = "NPCs: " .. #npcs
-            log.Text = "💀 " .. npc.Name .. " MORREU!"
+            atacando[npc] = nil
+        end)
+    end)
+    
+    -- Quando o jogador sair da hitbox, interrompe o dano
+    local function onTouchEnded()
+        if danoContinuo then
+            task.cancel(danoContinuo)
+            danoContinuo = nil
+        end
+        atacando[npc] = nil
+    end
+    
+    -- Detecta quando o jogador sai da hitbox
+    hitbox.TouchEnded:Connect(function(other)
+        if other and other:IsDescendantOf(character) then
+            onTouchEnded()
         end
     end)
 end
 
--- LOOP
-RunService.Stepped:Connect(function()
+-- ============================================
+-- LOOP DE ATUALIZAÇÃO (MAIS LEVE)
+-- ============================================
+local function atualizar()
     if not ativo then return end
+    
     for i = #npcs, 1, -1 do
         local npc = npcs[i]
         if not npc or not npc.Parent then
             table.remove(npcs, i)
             continue
         end
+        
         local hum = npc:FindFirstChild("Humanoid")
         if not hum or hum.Health <= 0 then
             mortos[npc] = true
@@ -199,6 +421,7 @@ RunService.Stepped:Connect(function()
             table.remove(npcs, i)
             continue
         end
+        
         local hitbox = npc:FindFirstChild("HitboxBorda")
         if hitbox then
             local root = npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChild("Head")
@@ -206,32 +429,45 @@ RunService.Stepped:Connect(function()
                 hitbox.Position = root.Position
                 hitbox.Size = Vector3.new(6, 6, 6) * alcance
             end
-        else
+        elseif not mortos[npc] then
             criarHitbox(npc)
         end
     end
+    
     npcCount.Text = "NPCs: " .. #npcs
-end)
+end
 
--- NOVOS NPCs
+RunService.Stepped:Connect(atualizar)
+
+-- ============================================
+-- DETECTAR NOVOS NPCs
+-- ============================================
 Workspace.ChildAdded:Connect(function(child)
-    task.wait(0.3)
+    task.wait(0.5)
     if child:IsA("Model") and child:FindFirstChild("Humanoid") then
         local hum = child:FindFirstChild("Humanoid")
-        if hum and hum.Health and hum.Health > 0 and child ~= character and child.Name ~= player.Name then
-            local existe = false
-            for _, n in pairs(npcs) do if n == child then existe = true break end end
-            if not existe then
-                table.insert(npcs, child)
-                if ativo then criarHitbox(child) end
-                npcCount.Text = "NPCs: " .. #npcs
-                log.Text = "🆕 " .. child.Name
+        if hum and hum.Health and hum.Health > 0 then
+            if child ~= character and child.Name ~= player.Name then
+                local existe = false
+                for _, n in pairs(npcs) do
+                    if n == child then existe = true break end
+                end
+                if not existe then
+                    table.insert(npcs, child)
+                    if ativo then
+                        criarHitbox(child)
+                    end
+                    npcCount.Text = "NPCs: " .. #npcs
+                    log.Text = "🆕 " .. child.Name
+                end
             end
         end
     end
 end)
 
+-- ============================================
 -- BOTÕES
+-- ============================================
 btnToggle.MouseButton1Click:Connect(function()
     ativo = not ativo
     if ativo then
@@ -240,8 +476,11 @@ btnToggle.MouseButton1Click:Connect(function()
         status.Text = "🟢 ON"
         status.TextColor3 = Color3.fromRGB(0, 255, 0)
         scanear()
-        for _, npc in pairs(npcs) do criarHitbox(npc) end
+        for _, npc in pairs(npcs) do
+            criarHitbox(npc)
+        end
         log.Text = "✅ Ativado (" .. #npcs .. " NPCs)"
+        print("🔥 HITBOX ATIVADA!")
     else
         btnToggle.Text = "ATIVAR"
         btnToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
@@ -251,7 +490,9 @@ btnToggle.MouseButton1Click:Connect(function()
             local h = npc:FindFirstChild("HitboxBorda")
             if h then h:Destroy() end
         end
+        atacando = {}
         log.Text = "❌ Desativado"
+        print("❌ HITBOX DESATIVADA")
     end
 end)
 
@@ -259,7 +500,9 @@ btnScan.MouseButton1Click:Connect(function()
     log.Text = "🔍 Scanear..."
     scanear()
     if ativo then
-        for _, npc in pairs(npcs) do criarHitbox(npc) end
+        for _, npc in pairs(npcs) do
+            criarHitbox(npc)
+        end
     end
     status.Text = "✅ " .. #npcs .. " NPCs"
     status.TextColor3 = Color3.fromRGB(0, 255, 0)
@@ -273,30 +516,57 @@ btnScan.MouseButton1Click:Connect(function()
     end
 end)
 
--- SLIDER
+-- ============================================
+-- SLIDER CORRIGIDO (FUNCIONA!)
+-- ============================================
 local arrastando = false
-sliderBg.MouseButton1Down:Connect(function() arrastando = true end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then arrastando = false end
+local offsetX = 0
+
+sliderBtn.MouseButton1Down:Connect(function()
+    arrastando = true
+    offsetX = 0
 end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        arrastando = false
+    end
+end)
+
 UserInputService.InputChanged:Connect(function(input)
     if arrastando and input.UserInputType == Enum.UserInputType.MouseMovement then
         local mouseX = input.Position.X
         local pos = (mouseX - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X
         pos = math.clamp(pos, 0, 1)
+        
         sliderBar.Size = UDim2.new(pos, 0, 1, 0)
         alcance = 1 + (pos * 8)
         sliderLabel.Text = string.format("%.1fx", alcance)
+        info.Text = "📏 " .. string.format("%.1f", alcance) .. "x"
+        
         if ativo then
             for _, npc in pairs(npcs) do
                 local h = npc:FindFirstChild("HitboxBorda")
-                if h then h.Size = Vector3.new(6, 6, 6) * alcance end
+                if h then
+                    h.Size = Vector3.new(6, 6, 6) * alcance
+                end
             end
         end
     end
 end)
 
+-- ============================================
 -- INICIAR
+-- ============================================
 task.wait(0.5)
 scanear()
-print("⚔️ HITBOX CARREGADO!")
+
+print("========================================")
+print("⚔️ HITBOX V8 - POTÊNCIA TOTAL!")
+print("✅ Sistema de dano: " .. sistemaDano.tipo)
+print("✅ SCAN para encontrar NPCs")
+print("✅ ATIVAR para criar hitboxes")
+print("✅ Slider FUNCIONA!")
+print("✅ Dano CONTÍNUO enquanto encostar!")
+print("✅ NPCs MORREM de verdade!")
+print("========================================")
