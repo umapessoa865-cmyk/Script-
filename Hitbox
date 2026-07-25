@@ -1,0 +1,302 @@
+-- HITBOX SIMPLES - FUNCIONA NO DELTA
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "Hitbox"
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 200, 0, 130)
+main.Position = UDim2.new(0.5, -100, 0.1, 0)
+main.BackgroundColor3 = Color3.fromRGB(10, 10, 25)
+main.BackgroundTransparency = 0.1
+main.BorderSizePixel = 0
+main.Parent = gui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 20)
+title.BackgroundTransparency = 1
+title.Text = "⚔️ HITBOX"
+title.TextColor3 = Color3.fromRGB(255, 50, 50)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Parent = main
+
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(1, 0, 0, 16)
+status.Position = UDim2.new(0, 0, 0, 22)
+status.BackgroundTransparency = 1
+status.Text = "🔴 OFF"
+status.TextColor3 = Color3.fromRGB(255, 0, 0)
+status.TextScaled = true
+status.Font = Enum.Font.GothamBold
+status.Parent = main
+
+local npcCount = Instance.new("TextLabel")
+npcCount.Size = UDim2.new(1, 0, 0, 14)
+npcCount.Position = UDim2.new(0, 0, 0, 40)
+npcCount.BackgroundTransparency = 1
+npcCount.Text = "NPCs: 0"
+npcCount.TextColor3 = Color3.fromRGB(150, 200, 255)
+npcCount.TextScaled = true
+npcCount.Font = Enum.Font.Gotham
+npcCount.Parent = main
+
+local btnToggle = Instance.new("TextButton")
+btnToggle.Size = UDim2.new(0.4, 0, 0, 25)
+btnToggle.Position = UDim2.new(0.05, 0, 0, 58)
+btnToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+btnToggle.Text = "ATIVAR"
+btnToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnToggle.TextScaled = true
+btnToggle.Font = Enum.Font.GothamBold
+btnToggle.BorderSizePixel = 0
+btnToggle.Parent = main
+
+local btnScan = Instance.new("TextButton")
+btnScan.Size = UDim2.new(0.4, 0, 0, 25)
+btnScan.Position = UDim2.new(0.55, 0, 0, 58)
+btnScan.BackgroundColor3 = Color3.fromRGB(50, 50, 200)
+btnScan.Text = "SCAN"
+btnScan.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnScan.TextScaled = true
+btnScan.Font = Enum.Font.GothamBold
+btnScan.BorderSizePixel = 0
+btnScan.Parent = main
+
+local sliderFrame = Instance.new("Frame")
+sliderFrame.Size = UDim2.new(0.9, 0, 0, 25)
+sliderFrame.Position = UDim2.new(0.05, 0, 0, 87)
+sliderFrame.BackgroundTransparency = 1
+sliderFrame.Parent = main
+
+local sliderLabel = Instance.new("TextLabel")
+sliderLabel.Size = UDim2.new(0.25, 0, 1, 0)
+sliderLabel.BackgroundTransparency = 1
+sliderLabel.Text = "2.0x"
+sliderLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+sliderLabel.TextScaled = true
+sliderLabel.Font = Enum.Font.GothamBold
+sliderLabel.Parent = sliderFrame
+
+local sliderBg = Instance.new("Frame")
+sliderBg.Size = UDim2.new(0.6, 0, 0.4, 0)
+sliderBg.Position = UDim2.new(0.3, 0, 0.3, 0)
+sliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+sliderBg.BorderSizePixel = 0
+sliderBg.Parent = sliderFrame
+
+local sliderBar = Instance.new("Frame")
+sliderBar.Size = UDim2.new(0.2, 0, 1, 0)
+sliderBar.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+sliderBar.BorderSizePixel = 0
+sliderBar.Parent = sliderBg
+
+local log = Instance.new("TextLabel")
+log.Size = UDim2.new(1, 0, 0, 12)
+log.Position = UDim2.new(0, 0, 0, 118)
+log.BackgroundTransparency = 1
+log.Text = "📝 Pronto"
+log.TextColor3 = Color3.fromRGB(100, 100, 100)
+log.TextScaled = true
+log.Font = Enum.Font.Gotham
+log.Parent = main
+
+-- VARIÁVEIS
+local ativo = false
+local alcance = 2.0
+local npcs = {}
+local mortos = {}
+
+-- SCANEAR
+local function scanear()
+    npcs = {}
+    mortos = {}
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
+            local hum = obj:FindFirstChild("Humanoid")
+            if hum and hum.Health and hum.Health > 0 and obj ~= character and obj.Name ~= player.Name then
+                table.insert(npcs, obj)
+            end
+        end
+    end
+    npcCount.Text = "NPCs: " .. #npcs
+    log.Text = "✅ Scan: " .. #npcs .. " NPCs"
+end
+
+-- CRIAR HITBOX
+local function criarHitbox(npc)
+    if mortos[npc] then return end
+    local antiga = npc:FindFirstChild("HitboxBorda")
+    if antiga then antiga:Destroy() end
+    local root = npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChild("Head")
+    if not root then return end
+
+    local hitbox = Instance.new("Part")
+    hitbox.Name = "HitboxBorda"
+    hitbox.Size = Vector3.new(6, 6, 6) * alcance
+    hitbox.Position = root.Position
+    hitbox.Anchored = true
+    hitbox.CanCollide = false
+    hitbox.Transparency = 0.4
+    hitbox.BrickColor = BrickColor.new("Bright red")
+    hitbox.Material = Enum.Material.Neon
+    hitbox.Parent = npc
+
+    local highlight = Instance.new("Highlight")
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.FillTransparency = 0.6
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineTransparency = 0.5
+    highlight.Parent = hitbox
+
+    hitbox.Touched:Connect(function(other)
+        if not ativo then return end
+        if not other or not other:IsDescendantOf(character) then return end
+        local hum = npc:FindFirstChild("Humanoid")
+        if not hum or hum.Health <= 0 then
+            mortos[npc] = true
+            if hitbox then hitbox:Destroy() end
+            return
+        end
+        local dano = 10 * alcance
+        hum.Health = hum.Health - dano
+        log.Text = "💥 " .. dano .. " (" .. npc.Name .. ")"
+        if hum.Health <= 0 then
+            hum.Health = 0
+            mortos[npc] = true
+            if hitbox then hitbox:Destroy() end
+            for i = #npcs, 1, -1 do
+                if npcs[i] == npc then table.remove(npcs, i) break end
+            end
+            npcCount.Text = "NPCs: " .. #npcs
+            log.Text = "💀 " .. npc.Name .. " MORREU!"
+        end
+    end)
+end
+
+-- LOOP
+RunService.Stepped:Connect(function()
+    if not ativo then return end
+    for i = #npcs, 1, -1 do
+        local npc = npcs[i]
+        if not npc or not npc.Parent then
+            table.remove(npcs, i)
+            continue
+        end
+        local hum = npc:FindFirstChild("Humanoid")
+        if not hum or hum.Health <= 0 then
+            mortos[npc] = true
+            local h = npc:FindFirstChild("HitboxBorda")
+            if h then h:Destroy() end
+            table.remove(npcs, i)
+            continue
+        end
+        local hitbox = npc:FindFirstChild("HitboxBorda")
+        if hitbox then
+            local root = npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChild("Head")
+            if root then
+                hitbox.Position = root.Position
+                hitbox.Size = Vector3.new(6, 6, 6) * alcance
+            end
+        else
+            criarHitbox(npc)
+        end
+    end
+    npcCount.Text = "NPCs: " .. #npcs
+end)
+
+-- NOVOS NPCs
+Workspace.ChildAdded:Connect(function(child)
+    task.wait(0.3)
+    if child:IsA("Model") and child:FindFirstChild("Humanoid") then
+        local hum = child:FindFirstChild("Humanoid")
+        if hum and hum.Health and hum.Health > 0 and child ~= character and child.Name ~= player.Name then
+            local existe = false
+            for _, n in pairs(npcs) do if n == child then existe = true break end end
+            if not existe then
+                table.insert(npcs, child)
+                if ativo then criarHitbox(child) end
+                npcCount.Text = "NPCs: " .. #npcs
+                log.Text = "🆕 " .. child.Name
+            end
+        end
+    end
+end)
+
+-- BOTÕES
+btnToggle.MouseButton1Click:Connect(function()
+    ativo = not ativo
+    if ativo then
+        btnToggle.Text = "OFF"
+        btnToggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        status.Text = "🟢 ON"
+        status.TextColor3 = Color3.fromRGB(0, 255, 0)
+        scanear()
+        for _, npc in pairs(npcs) do criarHitbox(npc) end
+        log.Text = "✅ Ativado (" .. #npcs .. " NPCs)"
+    else
+        btnToggle.Text = "ATIVAR"
+        btnToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        status.Text = "🔴 OFF"
+        status.TextColor3 = Color3.fromRGB(255, 0, 0)
+        for _, npc in pairs(npcs) do
+            local h = npc:FindFirstChild("HitboxBorda")
+            if h then h:Destroy() end
+        end
+        log.Text = "❌ Desativado"
+    end
+end)
+
+btnScan.MouseButton1Click:Connect(function()
+    log.Text = "🔍 Scanear..."
+    scanear()
+    if ativo then
+        for _, npc in pairs(npcs) do criarHitbox(npc) end
+    end
+    status.Text = "✅ " .. #npcs .. " NPCs"
+    status.TextColor3 = Color3.fromRGB(0, 255, 0)
+    task.wait(0.8)
+    if ativo then
+        status.Text = "🟢 ON"
+        status.TextColor3 = Color3.fromRGB(0, 255, 0)
+    else
+        status.Text = "🔴 OFF"
+        status.TextColor3 = Color3.fromRGB(255, 0, 0)
+    end
+end)
+
+-- SLIDER
+local arrastando = false
+sliderBg.MouseButton1Down:Connect(function() arrastando = true end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then arrastando = false end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if arrastando and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local mouseX = input.Position.X
+        local pos = (mouseX - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X
+        pos = math.clamp(pos, 0, 1)
+        sliderBar.Size = UDim2.new(pos, 0, 1, 0)
+        alcance = 1 + (pos * 8)
+        sliderLabel.Text = string.format("%.1fx", alcance)
+        if ativo then
+            for _, npc in pairs(npcs) do
+                local h = npc:FindFirstChild("HitboxBorda")
+                if h then h.Size = Vector3.new(6, 6, 6) * alcance end
+            end
+        end
+    end
+end)
+
+-- INICIAR
+task.wait(0.5)
+scanear()
+print("⚔️ HITBOX CARREGADO!")
