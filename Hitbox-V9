@@ -1,0 +1,691 @@
+-- HITBOX V9 - INTERFACE PREMIUM 💎
+-- Design elegante, animações suaves, experiência completa
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+
+-- ============================================
+-- DETECTOR DE SISTEMA DE DANO
+-- ============================================
+local sistemaDano = { tipo = "humanoid", remote = nil, atributo = nil }
+
+local function detectarRemotes()
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            local nome = obj.Name:lower()
+            if nome:find("damage") or nome:find("attack") or nome:find("hit") or 
+               nome:find("combat") or nome:find("enemy") or nome:find("monster") then
+                return obj
+            end
+        end
+    end
+    return nil
+end
+
+local function detectarAtributos()
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
+            local atts = obj:GetAttributes()
+            for nome, valor in pairs(atts) do
+                if type(valor) == "number" and (nome:lower():find("health") or nome:lower():find("hp") or nome:lower():find("vida")) then
+                    return nome
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local remote = detectarRemotes()
+local atributo = detectarAtributos()
+
+if remote then
+    sistemaDano.tipo = "remote"
+    sistemaDano.remote = remote
+elseif atributo then
+    sistemaDano.tipo = "atributo"
+    sistemaDano.atributo = atributo
+else
+    sistemaDano.tipo = "humanoid"
+end
+
+print("✅ Sistema de dano: " .. sistemaDano.tipo)
+
+-- ============================================
+-- FUNÇÃO DE DANO
+-- ============================================
+local function aplicarDano(npc, quantidade)
+    if not npc then return false end
+    local hum = npc:FindFirstChild("Humanoid")
+    if not hum then return false end
+
+    if sistemaDano.tipo == "humanoid" then
+        pcall(function() hum.Health = hum.Health - quantidade end)
+        return true
+    elseif sistemaDano.tipo == "remote" and sistemaDano.remote then
+        pcall(function()
+            if sistemaDano.remote:IsA("RemoteEvent") then
+                sistemaDano.remote:FireServer(quantidade, npc)
+            else
+                sistemaDano.remote:InvokeServer(quantidade, npc)
+            end
+        end)
+        return true
+    elseif sistemaDano.tipo == "atributo" and sistemaDano.atributo then
+        local att = npc:GetAttribute(sistemaDano.atributo)
+        if att and type(att) == "number" then
+            pcall(function() npc:SetAttribute(sistemaDano.atributo, att - quantidade) end)
+            return true
+        end
+    end
+    return false
+end
+
+-- ============================================
+-- INTERFACE PREMIUM
+-- ============================================
+local gui = Instance.new("ScreenGui")
+gui.Name = "HitboxPremium"
+gui.Parent = player:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+
+-- Fundo com efeito blur (opcional)
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundTransparency = 1
+bg.Parent = gui
+
+-- Frame principal com sombra
+local shadow = Instance.new("Frame")
+shadow.Size = UDim2.new(0, 310, 0, 220)
+shadow.Position = UDim2.new(0.5, -153, 0.1, 2)
+shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+shadow.BackgroundTransparency = 0.4
+shadow.BorderSizePixel = 0
+shadow.Parent = gui
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 310, 0, 220)
+main.Position = UDim2.new(0.5, -155, 0.1, 0)
+main.BackgroundColor3 = Color3.fromRGB(12, 12, 30)
+main.BackgroundTransparency = 0.05
+main.BorderSizePixel = 0
+main.ClipsDescendants = true
+main.Parent = gui
+
+-- Cantos arredondados (usando UICorner)
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = main
+
+-- Borda gradiente (falso)
+local border = Instance.new("Frame")
+border.Size = UDim2.new(1, 0, 1, 0)
+border.BackgroundTransparency = 1
+border.BorderSizePixel = 2
+border.BorderColor3 = Color3.fromRGB(100, 50, 200)
+border.Parent = main
+
+-- ============================================
+-- TOPO COM GRADIENTE
+-- ============================================
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 45)
+header.BackgroundColor3 = Color3.fromRGB(20, 10, 40)
+header.BorderSizePixel = 0
+header.Parent = main
+
+local headerCorner = Instance.new("UICorner")
+headerCorner.CornerRadius = UDim.new(0, 12)
+headerCorner.Parent = header
+
+-- Efeito de brilho no topo
+local glow = Instance.new("Frame")
+glow.Size = UDim2.new(0.6, 0, 0.4, 0)
+glow.Position = UDim2.new(0.2, 0, 0, 0)
+glow.BackgroundColor3 = Color3.fromRGB(150, 50, 255)
+glow.BackgroundTransparency = 0.5
+glow.BorderSizePixel = 0
+glow.Parent = header
+
+local glowCorner = Instance.new("UICorner")
+glowCorner.CornerRadius = UDim.new(0, 20)
+glowCorner.Parent = glow
+
+-- Título com ícone
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 1, 0)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "⚡ HITBOX PREMIUM"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Parent = header
+
+-- Subtítulo (sistema detectado)
+local subTitle = Instance.new("TextLabel")
+subTitle.Size = UDim2.new(1, 0, 0, 14)
+subTitle.Position = UDim2.new(0, 0, 0, 32)
+subTitle.BackgroundTransparency = 1
+subTitle.Text = "⚡ " .. sistemaDano.tipo:upper()
+subTitle.TextColor3 = Color3.fromRGB(150, 100, 255)
+subTitle.TextScaled = true
+subTitle.Font = Enum.Font.GothamBold
+subTitle.Parent = main
+
+-- ============================================
+-- STATUS E CONTADOR
+-- ============================================
+local statusFrame = Instance.new("Frame")
+statusFrame.Size = UDim2.new(0.5, -5, 0, 25)
+statusFrame.Position = UDim2.new(0.025, 0, 0, 50)
+statusFrame.BackgroundTransparency = 1
+statusFrame.Parent = main
+
+local statusIcon = Instance.new("TextLabel")
+statusIcon.Size = UDim2.new(0, 20, 1, 0)
+statusIcon.BackgroundTransparency = 1
+statusIcon.Text = "🔴"
+statusIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+statusIcon.TextScaled = true
+statusIcon.Font = Enum.Font.GothamBold
+statusIcon.Parent = statusFrame
+
+local statusText = Instance.new("TextLabel")
+statusText.Size = UDim2.new(1, -25, 1, 0)
+statusText.Position = UDim2.new(0, 22, 0, 0)
+statusText.BackgroundTransparency = 1
+statusText.Text = "DESATIVADO"
+statusText.TextColor3 = Color3.fromRGB(255, 80, 80)
+statusText.TextScaled = true
+statusText.Font = Enum.Font.GothamBold
+statusText.Parent = statusFrame
+
+local npcFrame = Instance.new("Frame")
+npcFrame.Size = UDim2.new(0.45, -5, 0, 25)
+npcFrame.Position = UDim2.new(0.525, 0, 0, 50)
+npcFrame.BackgroundTransparency = 1
+npcFrame.Parent = main
+
+local npcIcon = Instance.new("TextLabel")
+npcIcon.Size = UDim2.new(0, 20, 1, 0)
+npcIcon.BackgroundTransparency = 1
+npcIcon.Text = "🎯"
+npcIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+npcIcon.TextScaled = true
+npcIcon.Font = Enum.Font.GothamBold
+npcIcon.Parent = npcFrame
+
+local npcText = Instance.new("TextLabel")
+npcText.Size = UDim2.new(1, -25, 1, 0)
+npcText.Position = UDim2.new(0, 22, 0, 0)
+npcText.BackgroundTransparency = 1
+npcText.Text = "NPCs: 0"
+npcText.TextColor3 = Color3.fromRGB(150, 200, 255)
+npcText.TextScaled = true
+npcText.Font = Enum.Font.GothamBold
+npcText.Parent = npcFrame
+
+-- ============================================
+-- BOTÕES ESTILIZADOS
+-- ============================================
+local function criarBotao(nome, x, cor, texto, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.43, 0, 0, 30)
+    btn.Position = UDim2.new(x, 0, 0, 80)
+    btn.BackgroundColor3 = cor
+    btn.Text = texto
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextScaled = true
+    btn.Font = Enum.Font.GothamBold
+    btn.BorderSizePixel = 0
+    btn.Parent = main
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 6)
+    btnCorner.Parent = btn
+    
+    -- Efeito hover
+    local hoverTween = TweenService:Create(btn, TweenInfo.new(0.2), {
+        BackgroundColor3 = cor:Lerp(Color3.fromRGB(255, 255, 255), 0.15)
+    })
+    local leaveTween = TweenService:Create(btn, TweenInfo.new(0.2), {
+        BackgroundColor3 = cor
+    })
+    
+    btn.MouseEnter:Connect(function() hoverTween:Play() end)
+    btn.MouseLeave:Connect(function() leaveTween:Play() end)
+    
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+local btnAtivar = criarBotao("Ativar", 0.04, Color3.fromRGB(200, 40, 40), "ATIVAR", function()
+    ativo = not ativo
+    if ativo then
+        btnAtivar.Text = "DESATIVAR"
+        btnAtivar.BackgroundColor3 = Color3.fromRGB(40, 200, 40)
+        statusIcon.Text = "🟢"
+        statusText.Text = "ATIVADO"
+        statusText.TextColor3 = Color3.fromRGB(80, 255, 80)
+        scanear()
+        for _, npc in pairs(npcs) do criarHitbox(npc) end
+        logText.Text = "✅ Ativado (" .. #npcs .. " NPCs)"
+        notificar("🔥 Hitbox ativada!", Color3.fromRGB(80, 255, 80))
+    else
+        btnAtivar.Text = "ATIVAR"
+        btnAtivar.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+        statusIcon.Text = "🔴"
+        statusText.Text = "DESATIVADO"
+        statusText.TextColor3 = Color3.fromRGB(255, 80, 80)
+        for _, npc in pairs(npcs) do
+            local h = npc:FindFirstChild("HitboxBorda")
+            if h then h:Destroy() end
+        end
+        atacando = {}
+        logText.Text = "❌ Desativado"
+        notificar("❌ Hitbox desativada", Color3.fromRGB(255, 80, 80))
+    end
+end)
+
+local btnScan = criarBotao("Scan", 0.53, Color3.fromRGB(50, 50, 200), "SCANEAR", function()
+    logText.Text = "🔍 Scanear..."
+    scanear()
+    if ativo then
+        for _, npc in pairs(npcs) do criarHitbox(npc) end
+    end
+    notificar("✅ " .. #npcs .. " NPCs encontrados", Color3.fromRGB(80, 200, 255))
+    statusIcon.Text = "✅"
+    statusText.Text = #npcs .. " NPCs"
+    statusText.TextColor3 = Color3.fromRGB(80, 200, 255)
+    task.wait(0.8)
+    if ativo then
+        statusIcon.Text = "🟢"
+        statusText.Text = "ATIVADO"
+        statusText.TextColor3 = Color3.fromRGB(80, 255, 80)
+    else
+        statusIcon.Text = "🔴"
+        statusText.Text = "DESATIVADO"
+        statusText.TextColor3 = Color3.fromRGB(255, 80, 80)
+    end
+end)
+
+-- ============================================
+-- SLIDER PREMIUM
+-- ============================================
+local sliderFrame = Instance.new("Frame")
+sliderFrame.Size = UDim2.new(0.92, 0, 0, 35)
+sliderFrame.Position = UDim2.new(0.04, 0, 0, 115)
+sliderFrame.BackgroundTransparency = 1
+sliderFrame.Parent = main
+
+local sliderLabel = Instance.new("TextLabel")
+sliderLabel.Size = UDim2.new(0.25, 0, 1, 0)
+sliderLabel.BackgroundTransparency = 1
+sliderLabel.Text = "2.0x"
+sliderLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+sliderLabel.TextScaled = true
+sliderLabel.Font = Enum.Font.GothamBold
+sliderLabel.Parent = sliderFrame
+
+local sliderBg = Instance.new("Frame")
+sliderBg.Size = UDim2.new(0.6, 0, 0.5, 0)
+sliderBg.Position = UDim2.new(0.32, 0, 0.25, 0)
+sliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+sliderBg.BorderSizePixel = 0
+sliderBg.Parent = sliderFrame
+
+local sliderBgCorner = Instance.new("UICorner")
+sliderBgCorner.CornerRadius = UDim.new(0, 4)
+sliderBgCorner.Parent = sliderBg
+
+local sliderBar = Instance.new("Frame")
+sliderBar.Size = UDim2.new(0.2, 0, 1, 0)
+sliderBar.BackgroundColor3 = Color3.fromRGB(150, 50, 255)
+sliderBar.BorderSizePixel = 0
+sliderBar.Parent = sliderBg
+
+local sliderBarCorner = Instance.new("UICorner")
+sliderBarCorner.CornerRadius = UDim.new(0, 4)
+sliderBarCorner.Parent = sliderBar
+
+-- Thumb do slider
+local sliderThumb = Instance.new("Frame")
+sliderThumb.Size = UDim2.new(0, 20, 2, 0)
+sliderThumb.Position = UDim2.new(0.5, -10, -0.5, 0)
+sliderThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+sliderThumb.BorderSizePixel = 0
+sliderThumb.Parent = sliderBar
+
+local thumbCorner = Instance.new("UICorner")
+thumbCorner.CornerRadius = UDim.new(0, 10)
+thumbCorner.Parent = sliderThumb
+
+-- Sombra do thumb
+local thumbShadow = Instance.new("Frame")
+thumbShadow.Size = UDim2.new(1, 4, 1, 4)
+thumbShadow.Position = UDim2.new(0, -2, 0, -2)
+thumbShadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+thumbShadow.BackgroundTransparency = 0.3
+thumbShadow.BorderSizePixel = 0
+thumbShadow.Parent = sliderThumb
+
+local thumbShadowCorner = Instance.new("UICorner")
+thumbShadowCorner.CornerRadius = UDim.new(0, 12)
+thumbShadowCorner.Parent = thumbShadow
+
+-- ============================================
+-- LOG
+-- ============================================
+local logFrame = Instance.new("Frame")
+logFrame.Size = UDim2.new(0.92, 0, 0, 20)
+logFrame.Position = UDim2.new(0.04, 0, 0, 155)
+logFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 35)
+logFrame.BackgroundTransparency = 0.3
+logFrame.BorderSizePixel = 0
+logFrame.Parent = main
+
+local logCorner = Instance.new("UICorner")
+logCorner.CornerRadius = UDim.new(0, 4)
+logCorner.Parent = logFrame
+
+local logText = Instance.new("TextLabel")
+logText.Size = UDim2.new(1, -10, 1, 0)
+logText.Position = UDim2.new(0, 5, 0, 0)
+logText.BackgroundTransparency = 1
+logText.Text = "📝 Pronto para usar"
+logText.TextColor3 = Color3.fromRGB(150, 150, 200)
+logText.TextScaled = true
+logText.Font = Enum.Font.Gotham
+logText.Parent = logFrame
+
+-- ============================================
+-- SISTEMA DE NOTIFICAÇÕES
+-- ============================================
+local notificacoes = {}
+
+local function notificar(texto, cor)
+    local notif = Instance.new("Frame")
+    notif.Size = UDim2.new(0, 280, 0, 35)
+    notif.Position = UDim2.new(1, 10, 0, #notificacoes * 42 + 10)
+    notif.BackgroundColor3 = Color3.fromRGB(10, 10, 30)
+    notif.BackgroundTransparency = 0.05
+    notif.BorderSizePixel = 0
+    notif.Parent = gui
+    
+    local notifCorner = Instance.new("UICorner")
+    notifCorner.CornerRadius = UDim.new(0, 8)
+    notifCorner.Parent = notif
+    
+    local notifBorder = Instance.new("Frame")
+    notifBorder.Size = UDim2.new(1, 0, 1, 0)
+    notifBorder.BackgroundTransparency = 1
+    notifBorder.BorderSizePixel = 2
+    notifBorder.BorderColor3 = cor or Color3.fromRGB(150, 50, 255)
+    notifBorder.Parent = notif
+    
+    local notifText = Instance.new("TextLabel")
+    notifText.Size = UDim2.new(1, -20, 1, 0)
+    notifText.Position = UDim2.new(0, 10, 0, 0)
+    notifText.BackgroundTransparency = 1
+    notifText.Text = texto
+    notifText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    notifText.TextScaled = true
+    notifText.Font = Enum.Font.Gotham
+    notifText.Parent = notif
+    
+    -- Animação de entrada
+    notif.Position = UDim2.new(1, 10, 0, #notificacoes * 42 + 10)
+    local tween = TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+        Position = UDim2.new(0.85, 0, 0, #notificacoes * 42 + 10)
+    })
+    tween:Play()
+    
+    table.insert(notificacoes, notif)
+    
+    task.delay(3, function()
+        local fade = TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+            BackgroundTransparency = 1
+        })
+        fade:Play()
+        task.wait(0.3)
+        notif:Destroy()
+        for i, n in pairs(notificacoes) do
+            if n == notif then table.remove(notificacoes, i) break end
+        end
+    end)
+end
+
+-- ============================================
+-- LÓGICA DO SCRIPT
+-- ============================================
+local ativo = false
+local alcance = 2.0
+local npcs = {}
+local mortos = {}
+local atacando = {}
+
+-- SCANEAR
+local function scanear()
+    npcs = {}
+    mortos = {}
+    atacando = {}
+    
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
+            local hum = obj:FindFirstChild("Humanoid")
+            if hum and hum.Health and hum.Health > 0 then
+                if obj ~= character and obj.Name ~= player.Name then
+                    local ehInimigo = true
+                    local nome = obj.Name:lower()
+                    if nome:find("chest") or nome:find("spawn") or nome:find("door") or nome:find("plate") then
+                        ehInimigo = false
+                    end
+                    if ehInimigo then
+                        table.insert(npcs, obj)
+                    end
+                end
+            end
+        end
+    end
+    
+    npcText.Text = "NPCs: " .. #npcs
+    logText.Text = "✅ Scan: " .. #npcs .. " NPCs"
+end
+
+-- CRIAR HITBOX
+local function criarHitbox(npc)
+    if mortos[npc] then return end
+    if not npc or not npc.Parent then return end
+    
+    local antiga = npc:FindFirstChild("HitboxBorda")
+    if antiga then antiga:Destroy() end
+    
+    local root = npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChild("Head")
+    if not root then return end
+    
+    local hitbox = Instance.new("Part")
+    hitbox.Name = "HitboxBorda"
+    hitbox.Size = Vector3.new(6, 6, 6) * alcance
+    hitbox.Position = root.Position
+    hitbox.Anchored = true
+    hitbox.CanCollide = false
+    hitbox.Transparency = 0.35
+    hitbox.BrickColor = BrickColor.new("Bright red")
+    hitbox.Material = Enum.Material.Neon
+    hitbox.Parent = npc
+    
+    local highlight = Instance.new("Highlight")
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineColor = Color3.fromRGB(255, 100, 255)
+    highlight.OutlineTransparency = 0.3
+    highlight.Parent = hitbox
+    
+    local danoContinuo = nil
+    
+    hitbox.Touched:Connect(function(other)
+        if not ativo then return end
+        if not other or not other:IsDescendantOf(character) then return end
+        if mortos[npc] then return end
+        
+        local hum = npc:FindFirstChild("Humanoid")
+        if not hum or hum.Health <= 0 then
+            mortos[npc] = true
+            hitbox:Destroy()
+            return
+        end
+        
+        if atacando[npc] then return end
+        atacando[npc] = true
+        
+        danoContinuo = task.spawn(function()
+            while ativo and not mortos[npc] and hum and hum.Health > 0 do
+                local dano = 8 * alcance
+                aplicarDano(npc, dano)
+                logText.Text = "💥 " .. dano .. " (" .. npc.Name .. ")"
+                
+                if hum.Health <= 0 then
+                    hum.Health = 0
+                    mortos[npc] = true
+                    hitbox:Destroy()
+                    logText.Text = "💀 " .. npc.Name .. " MORREU!"
+                    notificar("💀 " .. npc.Name .. " morreu!", Color3.fromRGB(255, 50, 50))
+                    for i = #npcs, 1, -1 do
+                        if npcs[i] == npc then table.remove(npcs, i) break end
+                    end
+                    npcText.Text = "NPCs: " .. #npcs
+                    break
+                end
+                task.wait(0.15)
+            end
+            atacando[npc] = nil
+        end)
+    end)
+    
+    hitbox.TouchEnded:Connect(function(other)
+        if other and other:IsDescendantOf(character) then
+            if danoContinuo then
+                task.cancel(danoContinuo)
+                danoContinuo = nil
+            end
+            atacando[npc] = nil
+        end
+    end)
+end
+
+-- LOOP DE ATUALIZAÇÃO
+RunService.Stepped:Connect(function()
+    if not ativo then return end
+    
+    for i = #npcs, 1, -1 do
+        local npc = npcs[i]
+        if not npc or not npc.Parent then
+            table.remove(npcs, i)
+            continue
+        end
+        
+        local hum = npc:FindFirstChild("Humanoid")
+        if not hum or hum.Health <= 0 then
+            mortos[npc] = true
+            local h = npc:FindFirstChild("HitboxBorda")
+            if h then h:Destroy() end
+            table.remove(npcs, i)
+            continue
+        end
+        
+        local hitbox = npc:FindFirstChild("HitboxBorda")
+        if hitbox then
+            local root = npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChild("Head")
+            if root then
+                hitbox.Position = root.Position
+                hitbox.Size = Vector3.new(6, 6, 6) * alcance
+            end
+        elseif not mortos[npc] then
+            criarHitbox(npc)
+        end
+    end
+    
+    npcText.Text = "NPCs: " .. #npcs
+end)
+
+-- NOVOS NPCs
+Workspace.ChildAdded:Connect(function(child)
+    task.wait(0.5)
+    if child:IsA("Model") and child:FindFirstChild("Humanoid") then
+        local hum = child:FindFirstChild("Humanoid")
+        if hum and hum.Health and hum.Health > 0 then
+            if child ~= character and child.Name ~= player.Name then
+                local existe = false
+                for _, n in pairs(npcs) do
+                    if n == child then existe = true break end
+                end
+                if not existe then
+                    table.insert(npcs, child)
+                    if ativo then criarHitbox(child) end
+                    npcText.Text = "NPCs: " .. #npcs
+                    logText.Text = "🆕 " .. child.Name
+                    notificar("🆕 Novo NPC: " .. child.Name, Color3.fromRGB(255, 200, 100))
+                end
+            end
+        end
+    end
+end)
+
+-- ============================================
+-- SLIDER FUNCIONAL
+-- ============================================
+local arrastando = false
+
+sliderThumb.MouseButton1Down:Connect(function()
+    arrastando = true
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        arrastando = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if arrastando and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local mouseX = input.Position.X
+        local pos = (mouseX - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X
+        pos = math.clamp(pos, 0, 1)
+        
+        sliderBar.Size = UDim2.new(pos, 0, 1, 0)
+        alcance = 1 + (pos * 8)
+        sliderLabel.Text = string.format("%.1fx", alcance)
+        
+        if ativo then
+            for _, npc in pairs(npcs) do
+                local h = npc:FindFirstChild("HitboxBorda")
+                if h then
+                    h.Size = Vector3.new(6, 6, 6) * alcance
+                end
+            end
+        end
+    end
+end)
+
+-- ============================================
+-- INICIAR
+-- ============================================
+task.wait(0.5)
+scanear()
+notificar("⚡ Hitbox Premium carregada!", Color3.fromRGB(150, 50, 255))
+
+print("========================================")
+print("💎 HITBOX PREMIUM V9 - CARREGADO!")
+print("✅ Interface moderna e funcional")
+print("✅ Sistema de dano: " .. sistemaDano.tipo)
+print("✅ Slider, botões e notificações")
+print("========================================")
