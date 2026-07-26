@@ -1,10 +1,11 @@
--- HITBOX V16 - HITBOX DE ITEM! ⚽
--- Funciona em qualquer item (bola, objeto, etc.)
+-- HITBOX - FUTEBOL FÁCIL EDITION! ⚽🌈
+-- Cria hitbox na bola para controlar ela de longe
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
@@ -13,30 +14,27 @@ local character = player.Character or player.CharacterAdded:Wait()
 -- VARIÁVEIS
 -- ============================================
 local ativo = false
-local itemAlvo = nil
+local bolaAlvo = nil
 local hitboxAtiva = nil
 local minimizado = false
 
 -- ============================================
--- FUNÇÃO: ENCONTRAR ITEM (BOLA, OBJETO, ETC)
+-- FUNÇÃO: ENCONTRAR A BOLA
 -- ============================================
-local function encontrarItem()
-    -- Procura por objetos comuns em jogos
+local function encontrarBola()
+    -- Procura por objetos que parecem ser a bola
     for _, obj in pairs(Workspace:GetDescendants()) do
         if obj:IsA("BasePart") or obj:IsA("Model") then
             local nome = obj.Name:lower()
             
-            -- Palavras-chave para encontrar a bola/item
+            -- Palavras-chave para encontrar a bola
             if nome:find("ball") or 
                nome:find("bola") or 
-               nome:find("item") or 
-               nome:find("object") or
-               nome:find("pickup") or
-               nome:find("collect") or
-               nome:find("orb") or
+               nome:find("soccer") or 
+               nome:find("futebol") or
+               nome:find("football") or
                nome:find("sphere") or
-               nome:find("circle") or
-               nome:find("target") then
+               nome:find("circle") then
                 return obj
             end
         end
@@ -45,26 +43,25 @@ local function encontrarItem()
 end
 
 -- ============================================
--- FUNÇÃO: CRIAR HITBOX NO ITEM
+-- FUNÇÃO: CRIAR HITBOX NA BOLA
 -- ============================================
-local function criarHitboxItem(item)
-    if not item then return end
+local function criarHitboxBola(bola)
+    if not bola then return end
     
     -- Remove hitbox antiga
-    local antiga = item:FindFirstChild("HitboxBorda")
+    local antiga = bola:FindFirstChild("HitboxBorda")
     if antiga then antiga:Destroy() end
     
-    -- Determina a posição do item
+    -- Determina a posição da bola
     local posicao
-    if item:IsA("BasePart") then
-        posicao = item.Position
-    elseif item:IsA("Model") then
-        local root = item:FindFirstChild("HumanoidRootPart") or item:FindFirstChild("Head") or item.PrimaryPart
+    if bola:IsA("BasePart") then
+        posicao = bola.Position
+    elseif bola:IsA("Model") then
+        local root = bola:FindFirstChild("HumanoidRootPart") or bola:FindFirstChild("Head") or bola.PrimaryPart
         if root then
             posicao = root.Position
         else
-            -- Tenta pegar a posição de qualquer parte
-            for _, part in pairs(item:GetChildren()) do
+            for _, part in pairs(bola:GetChildren()) do
                 if part:IsA("BasePart") then
                     posicao = part.Position
                     break
@@ -75,19 +72,19 @@ local function criarHitboxItem(item)
     
     if not posicao then return end
     
-    -- Cria a hitbox (tamanho fixo 5)
+    -- Cria a hitbox (tamanho 6 para cobrir bem a bola)
     local hitbox = Instance.new("Part")
     hitbox.Name = "HitboxBorda"
-    hitbox.Size = Vector3.new(5, 5, 5)
+    hitbox.Size = Vector3.new(6, 6, 6)
     hitbox.Position = posicao
     hitbox.Anchored = true
     hitbox.CanCollide = false
     hitbox.Transparency = 0.3
     hitbox.BrickColor = BrickColor.new("Bright red")
     hitbox.Material = Enum.Material.Neon
-    hitbox.Parent = item
+    hitbox.Parent = bola
     
-    -- Highlight para ficar mais visível
+    -- Highlight
     local highlight = Instance.new("Highlight")
     highlight.FillColor = Color3.fromRGB(255, 0, 0)
     highlight.FillTransparency = 0.4
@@ -115,7 +112,7 @@ end
 -- FUNÇÃO: ATUALIZAR POSIÇÃO DA HITBOX
 -- ============================================
 local function atualizarHitbox()
-    if not ativo or not itemAlvo then
+    if not ativo or not bolaAlvo then
         if hitboxAtiva then
             hitboxAtiva:Destroy()
             hitboxAtiva = nil
@@ -124,20 +121,20 @@ local function atualizarHitbox()
     end
     
     if not hitboxAtiva or not hitboxAtiva.Parent then
-        criarHitboxItem(itemAlvo)
+        criarHitboxBola(bolaAlvo)
         return
     end
     
-    -- Atualiza a posição do item
+    -- Atualiza a posição da bola
     local posicao
-    if itemAlvo:IsA("BasePart") then
-        posicao = itemAlvo.Position
-    elseif itemAlvo:IsA("Model") then
-        local root = itemAlvo:FindFirstChild("HumanoidRootPart") or itemAlvo:FindFirstChild("Head") or itemAlvo.PrimaryPart
+    if bolaAlvo:IsA("BasePart") then
+        posicao = bolaAlvo.Position
+    elseif bolaAlvo:IsA("Model") then
+        local root = bolaAlvo:FindFirstChild("HumanoidRootPart") or bolaAlvo:FindFirstChild("Head") or bolaAlvo.PrimaryPart
         if root then
             posicao = root.Position
         else
-            for _, part in pairs(itemAlvo:GetChildren()) do
+            for _, part in pairs(bolaAlvo:GetChildren()) do
                 if part:IsA("BasePart") then
                     posicao = part.Position
                     break
@@ -152,16 +149,16 @@ local function atualizarHitbox()
 end
 
 -- ============================================
--- INTERFACE SIMPLES
+-- INTERFACE
 -- ============================================
 local gui = Instance.new("ScreenGui")
-gui.Name = "HitboxItem"
+gui.Name = "HitboxFutebol"
 gui.Parent = player:WaitForChild("PlayerGui")
 gui.ResetOnSpawn = false
 
 local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 250, 0, 140)
-main.Position = UDim2.new(0.5, -125, 0.1, 0)
+main.Size = UDim2.new(0, 280, 0, 160)
+main.Position = UDim2.new(0.5, -140, 0.1, 0)
 main.BackgroundColor3 = Color3.fromRGB(12, 12, 30)
 main.BackgroundTransparency = 0.05
 main.BorderSizePixel = 0
@@ -183,7 +180,7 @@ local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -60, 1, 0)
 title.Position = UDim2.new(0, 10, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "⚡ HITBOX ITEM"
+title.Text = "⚽ HITBOX BOLA"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextScaled = true
 title.Font = Enum.Font.GothamBold
@@ -224,25 +221,23 @@ status.TextScaled = true
 status.Font = Enum.Font.GothamBold
 status.Parent = main
 
--- Item detectado
-local itemStatus = Instance.new("TextLabel")
-itemStatus.Size = UDim2.new(1, 0, 0, 16)
-itemStatus.Position = UDim2.new(0, 0, 0, 56)
-itemStatus.BackgroundTransparency = 1
-itemStatus.Text = "📦 Item: NENHUM"
-itemStatus.TextColor3 = Color3.fromRGB(255, 200, 100)
-itemStatus.TextScaled = true
-itemStatus.Font = Enum.Font.Gotham
-itemStatus.Parent = main
+-- Status da Bola
+local bolaStatus = Instance.new("TextLabel")
+bolaStatus.Size = UDim2.new(1, 0, 0, 16)
+bolaStatus.Position = UDim2.new(0, 0, 0, 56)
+bolaStatus.BackgroundTransparency = 1
+bolaStatus.Text = "⚽ Bola: NENHUMA"
+bolaStatus.TextColor3 = Color3.fromRGB(255, 200, 100)
+bolaStatus.TextScaled = true
+bolaStatus.Font = Enum.Font.Gotham
+bolaStatus.Parent = main
 
--- ============================================
--- BOTÃO ÚNICO (ATIVAR/DESATIVAR)
--- ============================================
+-- Botão ATIVAR
 local btnToggle = Instance.new("TextButton")
 btnToggle.Size = UDim2.new(0.8, 0, 0, 35)
-btnToggle.Position = UDim2.new(0.1, 0, 0, 80)
+btnToggle.Position = UDim2.new(0.1, 0, 0, 78)
 btnToggle.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
-btnToggle.Text = "🔥 ATIVAR HITBOX"
+btnToggle.Text = "⚽ ATIVAR HITBOX"
 btnToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
 btnToggle.TextScaled = true
 btnToggle.Font = Enum.Font.GothamBold
@@ -258,72 +253,68 @@ local log = Instance.new("TextLabel")
 log.Size = UDim2.new(0.9, 0, 0, 16)
 log.Position = UDim2.new(0.05, 0, 0, 120)
 log.BackgroundTransparency = 1
-log.Text = "📝 Procurando item..."
+log.Text = "📝 Procurando bola..."
 log.TextColor3 = Color3.fromRGB(150, 150, 200)
 log.TextScaled = true
 log.Font = Enum.Font.Gotham
 log.Parent = main
 
 -- ============================================
--- FUNÇÃO: PROCURAR ITEM E ATUALIZAR STATUS
+-- FUNÇÃO: PROCURAR BOLA
 -- ============================================
-local function procurarItem()
-    local item = encontrarItem()
-    if item then
-        itemAlvo = item
-        itemStatus.Text = "📦 Item: " .. item.Name
-        itemStatus.TextColor3 = Color3.fromRGB(80, 255, 80)
-        log.Text = "✅ Item encontrado: " .. item.Name
-        print("🎯 Item encontrado: " .. item.Name)
+local function procurarBola()
+    local bola = encontrarBola()
+    if bola then
+        bolaAlvo = bola
+        bolaStatus.Text = "⚽ Bola: " .. bola.Name
+        bolaStatus.TextColor3 = Color3.fromRGB(80, 255, 80)
+        log.Text = "✅ Bola encontrada: " .. bola.Name
+        print("⚽ Bola encontrada: " .. bola.Name)
         
         if ativo then
-            criarHitboxItem(item)
+            criarHitboxBola(bola)
         end
     else
-        itemAlvo = nil
-        itemStatus.Text = "📦 Item: NENHUM"
-        itemStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
-        log.Text = "❌ Nenhum item encontrado"
-        print("❌ Nenhum item encontrado")
+        bolaAlvo = nil
+        bolaStatus.Text = "⚽ Bola: NENHUMA"
+        bolaStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        log.Text = "❌ Nenhuma bola encontrada"
+        print("❌ Nenhuma bola encontrada")
     end
 end
 
 -- ============================================
--- LOOP DE ATUALIZAÇÃO
+-- LOOP
 -- ============================================
 RunService.Heartbeat:Connect(function()
-    if ativo and itemAlvo then
+    if ativo and bolaAlvo then
         atualizarHitbox()
     end
 end)
 
 -- ============================================
--- DETECTAR QUANDO O ITEM MUDA
+-- DETECTAR QUANDO A BOLA MUDA
 -- ============================================
--- Procura por novos itens a cada 2 segundos
 task.spawn(function()
     while true do
         task.wait(2)
         if not ativo then
-            -- Se estiver desativado, só atualiza o status
-            local item = encontrarItem()
-            if item then
-                itemAlvo = item
-                itemStatus.Text = "📦 Item: " .. item.Name
-                itemStatus.TextColor3 = Color3.fromRGB(80, 255, 80)
+            local bola = encontrarBola()
+            if bola then
+                bolaAlvo = bola
+                bolaStatus.Text = "⚽ Bola: " .. bola.Name
+                bolaStatus.TextColor3 = Color3.fromRGB(80, 255, 80)
             end
         end
     end
 end)
 
--- Detecta quando algo entra no Workspace
 Workspace.ChildAdded:Connect(function(child)
     task.wait(0.5)
     if child:IsA("BasePart") or child:IsA("Model") then
         local nome = child.Name:lower()
-        if nome:find("ball") or nome:find("bola") or nome:find("item") or 
-           nome:find("object") or nome:find("pickup") or nome:find("collect") then
-            procurarItem()
+        if nome:find("ball") or nome:find("bola") or nome:find("soccer") or nome:find("futebol") then
+            procurarBola()
         end
     end
 end)
@@ -335,30 +326,29 @@ btnToggle.MouseButton1Click:Connect(function()
     ativo = not ativo
     
     if ativo then
-        btnToggle.Text = "⛔ DESATIVAR HITBOX"
+        btnToggle.Text = "⛔ DESATIVAR"
         btnToggle.BackgroundColor3 = Color3.fromRGB(40, 200, 40)
         status.Text = "🟢 ATIVADO"
         status.TextColor3 = Color3.fromRGB(80, 255, 80)
         
-        -- Procura o item se não tiver
-        if not itemAlvo then
-            procurarItem()
+        if not bolaAlvo then
+            procurarBola()
         end
         
-        if itemAlvo then
-            criarHitboxItem(itemAlvo)
-            log.Text = "🔥 Hitbox ativada no item!"
-            print("🔥 Hitbox ativada em: " .. itemAlvo.Name)
+        if bolaAlvo then
+            criarHitboxBola(bolaAlvo)
+            log.Text = "🔥 Hitbox ativada na bola!"
+            print("🔥 Hitbox ativada na bola!")
         else
-            log.Text = "⚠️ Nenhum item encontrado!"
+            log.Text = "⚠️ Nenhuma bola encontrada!"
             ativo = false
-            btnToggle.Text = "🔥 ATIVAR HITBOX"
+            btnToggle.Text = "⚽ ATIVAR HITBOX"
             btnToggle.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
             status.Text = "🔴 DESATIVADO"
             status.TextColor3 = Color3.fromRGB(255, 80, 80)
         end
     else
-        btnToggle.Text = "🔥 ATIVAR HITBOX"
+        btnToggle.Text = "⚽ ATIVAR HITBOX"
         btnToggle.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
         status.Text = "🔴 DESATIVADO"
         status.TextColor3 = Color3.fromRGB(255, 80, 80)
@@ -379,24 +369,18 @@ btnMin.MouseButton1Click:Connect(function()
     minimizado = not minimizado
     
     if minimizado then
-        main.Size = UDim2.new(0, 250, 0, 30)
-        main.Position = UDim2.new(0.5, -125, 0, 0)
-        
+        main.Size = UDim2.new(0, 280, 0, 30)
+        main.Position = UDim2.new(0.5, -140, 0, 0)
         for _, child in pairs(main:GetChildren()) do
-            if child ~= header then
-                child.Visible = false
-            end
+            if child ~= header then child.Visible = false end
         end
-        
         btnMin.Text = "□"
     else
-        main.Size = UDim2.new(0, 250, 0, 140)
-        main.Position = UDim2.new(0.5, -125, 0.1, 0)
-        
+        main.Size = UDim2.new(0, 280, 0, 160)
+        main.Position = UDim2.new(0.5, -140, 0.1, 0)
         for _, child in pairs(main:GetChildren()) do
             child.Visible = true
         end
-        
         btnMin.Text = "─"
     end
 end)
@@ -409,7 +393,6 @@ btnClose.MouseButton1Click:Connect(function()
             hitboxAtiva = nil
         end
     end
-    
     gui:Destroy()
     print("❌ Script encerrado")
 end)
@@ -418,11 +401,11 @@ end)
 -- INICIAR
 -- ============================================
 task.wait(0.5)
-procurarItem()
+procurarBola()
 
 print("========================================")
-print("⚡ HITBOX DE ITEM V16!")
-print("✅ Procura automaticamente por itens")
+print("⚽ HITBOX - FUTEBOL FÁCIL EDITION!")
+print("✅ Procura automaticamente pela bola")
 print("✅ Botão único para ATIVAR/DESATIVAR")
-print("✅ Hitbox vermelha em volta do item")
+print("✅ Hitbox vermelha em volta da bola")
 print("========================================")
