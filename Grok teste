@@ -1,117 +1,100 @@
--- Aimbot de Teste (para testar anti-aimbot)
--- Cole no Delta e execute
-
+-- Aimbot com GUI (mais compatível com Delta)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- ======================
--- CONFIGURAÇÕES
--- ======================
-local FOV = 180                -- Campo de visão do aimbot (180 = quase tela inteira)
-local TeamCheck = true         -- true = não mira em aliados
-local WallCheck = false        -- true = só mira se tiver linha de visão
-local AimPart = "Head"         -- "Head" ou "HumanoidRootPart"
-local Smoothness = 1           -- 1 = travamento instantâneo | quanto maior, mais suave
-local ToggleKey = Enum.KeyCode.Q  -- Tecla para ligar/desligar
+-- Configurações
+local FOV = 200
+local TeamCheck = true
+local AimPart = "Head"
+local Smoothness = 1.2
+local AimbotEnabled = false
 
--- ======================
--- VARIÁVEIS
--- ======================
-local AimbotEnabled = true
-local Holding = false
+-- ==================== GUI ====================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AimbotGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Desenha o círculo do FOV (opcional, só para visualizar)
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 1
-FOVCircle.NumSides = 64
-FOVCircle.Radius = FOV
-FOVCircle.Filled = false
-FOVCircle.Color = Color3.fromRGB(255, 255, 255)
-FOVCircle.Visible = true
-FOVCircle.Transparency = 0.7
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 160, 0, 50)
+Frame.Position = UDim2.new(0.5, -80, 0.15, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+Frame.BorderSizePixel = 0
+Frame.Active = true
+Frame.Draggable = true
+Frame.Parent = ScreenGui
 
--- ======================
--- FUNÇÕES
--- ======================
-local function GetClosestPlayer()
-    local closestPlayer = nil
-    local shortestDistance = FOV
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 8)
+Corner.Parent = Frame
 
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-            
-            -- Team Check
-            if TeamCheck and player.Team == LocalPlayer.Team then
-                continue
-            end
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(1, -10, 1, -10)
+ToggleBtn.Position = UDim2.new(0, 5, 0, 5)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+ToggleBtn.Text = "Aimbot: OFF"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 16
+ToggleBtn.Parent = Frame
 
-            local targetPart = player.Character:FindFirstChild(AimPart)
-            if not targetPart then continue end
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 6)
+BtnCorner.Parent = ToggleBtn
 
-            local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-            
-            if onScreen then
-                local mousePos = UserInputService:GetMouseLocation()
-                local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+ToggleBtn.MouseButton1Click:Connect(function()
+	AimbotEnabled = not AimbotEnabled
+	if AimbotEnabled then
+		ToggleBtn.Text = "Aimbot: ON"
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+	else
+		ToggleBtn.Text = "Aimbot: OFF"
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+	end
+end)
 
-                if distance < shortestDistance then
-                    -- Wall Check (opcional)
-                    if WallCheck then
-                        local ray = Ray.new(Camera.CFrame.Position, (targetPart.Position - Camera.CFrame.Position).Unit * 500)
-                        local hit = workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character, Camera})
-                        if hit and hit:IsDescendantOf(player.Character) then
-                            closestPlayer = player
-                            shortestDistance = distance
-                        end
-                    else
-                        closestPlayer = player
-                        shortestDistance = distance
-                    end
-                end
-            end
-        end
-    end
+-- ==================== Função do Aimbot ====================
+local function GetClosest()
+	local closest = nil
+	local shortest = FOV
+	local mousePos = UserInputService:GetMouseLocation()
 
-    return closestPlayer
+	for _, player in pairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character then
+			local hum = player.Character:FindFirstChildOfClass("Humanoid")
+			local part = player.Character:FindFirstChild(AimPart)
+
+			if hum and hum.Health > 0 and part then
+				if TeamCheck and player.Team and player.Team == LocalPlayer.Team then
+					-- pula aliado
+				else
+					local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+					if onScreen then
+						local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+						if dist < shortest then
+							shortest = dist
+							closest = part
+						end
+					end
+				end
+			end
+		end
+	end
+	return closest
 end
 
--- ======================
--- LOOP PRINCIPAL
--- ======================
+-- ==================== Loop ====================
 RunService.RenderStepped:Connect(function()
-    -- Atualiza o círculo do FOV
-    FOVCircle.Position = UserInputService:GetMouseLocation()
-    FOVCircle.Radius = FOV
+	if not AimbotEnabled then return end
 
-    if not AimbotEnabled then return end
-
-    local target = GetClosestPlayer()
-    
-    if target and target.Character and target.Character:FindFirstChild(AimPart) then
-        local targetPos = target.Character[AimPart].Position
-        
-        -- Calcula a nova CFrame da câmera
-        local newCFrame = CFrame.new(Camera.CFrame.Position, targetPos)
-        
-        -- Aplica com smoothness
-        Camera.CFrame = Camera.CFrame:Lerp(newCFrame, 1 / Smoothness)
-    end
+	local target = GetClosest()
+	if target then
+		local newCF = CFrame.new(Camera.CFrame.Position, target.Position)
+		Camera.CFrame = Camera.CFrame:Lerp(newCF, 1 / Smoothness)
+	end
 end)
 
--- ======================
--- TOGGLE (Ligar/Desligar)
--- ======================
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if input.KeyCode == ToggleKey then
-        AimbotEnabled = not AimbotEnabled
-        FOVCircle.Color = AimbotEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-        print("Aimbot:", AimbotEnabled and "ATIVADO" or "DESATIVADO")
-    end
-end)
-
-print("Aimbot carregado! Tecla Q para ligar/desligar")
+print("Aimbot com GUI carregado!")
