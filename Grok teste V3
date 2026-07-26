@@ -1,0 +1,265 @@
+--[[
+	Hitbox Expander Avançado
+	- Suporta NPCs + Players
+	- GUI completa
+	- Multiplicador ajustável
+	- Visualização da hitbox
+	- Restaura tamanho original ao desligar
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- ====================== CONFIGURAÇÕES ======================
+local Settings = {
+	Enabled = false,
+	Multiplier = 4,               -- Tamanho da hitbox (4 = 4x maior)
+	TargetNPCs = true,            -- Aumentar hitbox de NPCs
+	TargetPlayers = false,        -- Aumentar hitbox de Players (cuidado)
+	ShowVisual = true,            -- Deixar a hitbox visível (semi-transparente)
+	PartsToExpand = {             -- Quais partes vão ser aumentadas
+		"HumanoidRootPart",
+		"Head",
+		"UpperTorso",
+		"LowerTorso",
+		"Torso"                   -- para R6
+	}
+}
+
+-- ====================== VARIÁVEIS ======================
+local OriginalSizes = {}          -- Guarda os tamanhos originais
+local ExpandedParts = {}
+
+-- ====================== GUI ======================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AdvancedHitbox"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = game:GetService("CoreGui")
+
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 220, 0, 210)
+Main.Position = UDim2.new(0.5, -110, 0.25, 0)
+Main.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = Main
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 32)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+Title.Text = "Hitbox Expander"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 15
+Title.Parent = Main
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = Title
+
+-- Botão Principal ON/OFF
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.9, 0, 0, 34)
+ToggleBtn.Position = UDim2.new(0.05, 0, 0, 42)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 45, 45)
+ToggleBtn.Text = "Status: OFF"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 14
+ToggleBtn.Parent = Main
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 6)
+ToggleCorner.Parent = ToggleBtn
+
+-- Botão Multiplicador
+local MultiBtn = Instance.new("TextButton")
+MultiBtn.Size = UDim2.new(0.9, 0, 0, 30)
+MultiBtn.Position = UDim2.new(0.05, 0, 0, 85)
+MultiBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+MultiBtn.Text = "Multiplier: " .. Settings.Multiplier .. "x"
+MultiBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MultiBtn.Font = Enum.Font.Gotham
+MultiBtn.TextSize = 13
+MultiBtn.Parent = Main
+
+local MultiCorner = Instance.new("UICorner")
+MultiCorner.CornerRadius = UDim.new(0, 6)
+MultiCorner.Parent = MultiBtn
+
+-- Botão NPCs
+local NPCBtn = Instance.new("TextButton")
+NPCBtn.Size = UDim2.new(0.9, 0, 0, 28)
+NPCBtn.Position = UDim2.new(0.05, 0, 0, 125)
+NPCBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+NPCBtn.Text = "NPCs: ON"
+NPCBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+NPCBtn.Font = Enum.Font.Gotham
+NPCBtn.TextSize = 13
+NPCBtn.Parent = Main
+
+local NPCCorner = Instance.new("UICorner")
+NPCCorner.CornerRadius = UDim.new(0, 6)
+NPCCorner.Parent = NPCBtn
+
+-- Botão Players
+local PlayerBtn = Instance.new("TextButton")
+PlayerBtn.Size = UDim2.new(0.9, 0, 0, 28)
+PlayerBtn.Position = UDim2.new(0.05, 0, 0, 160)
+PlayerBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+PlayerBtn.Text = "Players: OFF"
+PlayerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+PlayerBtn.Font = Enum.Font.Gotham
+PlayerBtn.TextSize = 13
+PlayerBtn.Parent = Main
+
+local PlayerCorner = Instance.new("UICorner")
+PlayerCorner.CornerRadius = UDim.new(0, 6)
+PlayerCorner.Parent = PlayerBtn
+
+-- ====================== FUNÇÕES ======================
+local function IsNPC(character)
+	return character and character:FindFirstChildOfClass("Humanoid") and not Players:GetPlayerFromCharacter(character)
+end
+
+local function IsPlayerCharacter(character)
+	return character and Players:GetPlayerFromCharacter(character) ~= nil
+end
+
+local function ExpandPart(part)
+	if not part or not part:IsA("BasePart") then return end
+	if ExpandedParts[part] then return end
+
+	-- Salva tamanho original
+	OriginalSizes[part] = part.Size
+	ExpandedParts[part] = true
+
+	part.Size = part.Size * Settings.Multiplier
+	part.Massless = true
+	part.CanCollide = false
+
+	if Settings.ShowVisual then
+		part.Transparency = 0.65
+		part.Color = Color3.fromRGB(255, 50, 50)
+	end
+end
+
+local function RestorePart(part)
+	if not part or not OriginalSizes[part] then return end
+	part.Size = OriginalSizes[part]
+	part.Transparency = 0
+	part.Color = Color3.fromRGB(163, 162, 165) -- cor padrão aproximada
+	ExpandedParts[part] = nil
+	OriginalSizes[part] = nil
+end
+
+local function ProcessCharacter(character)
+	if not character then return end
+
+	local shouldExpand = false
+	if Settings.TargetNPCs and IsNPC(character) then
+		shouldExpand = true
+	elseif Settings.TargetPlayers and IsPlayerCharacter(character) and character ~= LocalPlayer.Character then
+		shouldExpand = true
+	end
+
+	if not shouldExpand then return end
+
+	for _, partName in ipairs(Settings.PartsToExpand) do
+		local part = character:FindFirstChild(partName)
+		if part then
+			ExpandPart(part)
+		end
+	end
+end
+
+local function RestoreAll()
+	for part, _ in pairs(ExpandedParts) do
+		if part and part.Parent then
+			RestorePart(part)
+		end
+	end
+	ExpandedParts = {}
+	OriginalSizes = {}
+end
+
+local function RefreshAll()
+	RestoreAll()
+	if not Settings.Enabled then return end
+
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
+			ProcessCharacter(obj)
+		end
+	end
+end
+
+-- ====================== BOTÕES ======================
+ToggleBtn.MouseButton1Click:Connect(function()
+	Settings.Enabled = not Settings.Enabled
+	if Settings.Enabled then
+		ToggleBtn.Text = "Status: ON"
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 170, 60)
+		RefreshAll()
+	else
+		ToggleBtn.Text = "Status: OFF"
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 45, 45)
+		RestoreAll()
+	end
+end)
+
+local Multipliers = {2, 3, 4, 5, 6, 8, 10}
+local MultiIndex = 3
+
+MultiBtn.MouseButton1Click:Connect(function()
+	MultiIndex = MultiIndex % #Multipliers + 1
+	Settings.Multiplier = Multipliers[MultiIndex]
+	MultiBtn.Text = "Multiplier: " .. Settings.Multiplier .. "x"
+	if Settings.Enabled then
+		RefreshAll()
+	end
+end)
+
+NPCBtn.MouseButton1Click:Connect(function()
+	Settings.TargetNPCs = not Settings.TargetNPCs
+	NPCBtn.Text = "NPCs: " .. (Settings.TargetNPCs and "ON" or "OFF")
+	if Settings.Enabled then RefreshAll() end
+end)
+
+PlayerBtn.MouseButton1Click:Connect(function()
+	Settings.TargetPlayers = not Settings.TargetPlayers
+	PlayerBtn.Text = "Players: " .. (Settings.TargetPlayers and "ON" or "OFF")
+	if Settings.Enabled then RefreshAll() end
+end)
+
+-- ====================== LOOP + EVENTOS ======================
+workspace.DescendantAdded:Connect(function(obj)
+	if Settings.Enabled and obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
+		task.wait(0.15)
+		ProcessCharacter(obj)
+	end
+end)
+
+-- Atualiza periodicamente (caso algum NPC resete o tamanho)
+task.spawn(function()
+	while true do
+		if Settings.Enabled then
+			for _, obj in ipairs(workspace:GetDescendants()) do
+				if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
+					ProcessCharacter(obj)
+				end
+			end
+		end
+		task.wait(1.5)
+	end
+end)
+
+print("Hitbox Expander Avançado carregado!")
