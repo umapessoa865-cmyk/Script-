@@ -1,4 +1,4 @@
--- HITBOX V12 - COM MINIMIZAR E FECHAR! 🎯
+-- HITBOX V14 - COM ITENS E BOTÃO DE AUMENTO! ⚔️
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -10,19 +10,51 @@ local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 
 -- ============================================
--- SISTEMA DE DANO
+-- VARIÁVEIS
+-- ============================================
+local ativo = false
+local tamanhoHitbox = 6
+local players = {}
+local mortos = {}
+local atacando = {}
+local minimizado = false
+
+-- ============================================
+-- FUNÇÃO: VERIFICAR SE TEM ITEM EQUIPADO
+-- ============================================
+local function temItemEquipado()
+    if not character then return false end
+    
+    for _, child in pairs(character:GetChildren()) do
+        if child:IsA("Tool") then
+            return true
+        end
+    end
+    return false
+end
+
+-- ============================================
+-- FUNÇÃO: APLICAR DANO
 -- ============================================
 local function aplicarDano(alvo, quantidade)
     if not alvo then return false end
+    
+    -- Só aplica dano se tiver item equipado
+    if not temItemEquipado() then
+        return false
+    end
+    
     local hum = alvo:FindFirstChild("Humanoid")
     if not hum then return false end
     
+    -- Tenta Humanoid
     local sucesso, erro = pcall(function()
         hum.Health = hum.Health - quantidade
     end)
     
     if sucesso then return true end
     
+    -- Tenta RemoteEvents
     for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
         if obj:IsA("RemoteEvent") then
             pcall(function() obj:FireServer(quantidade, alvo) end)
@@ -33,16 +65,16 @@ local function aplicarDano(alvo, quantidade)
 end
 
 -- ============================================
--- INTERFACE (COM MINIMIZAR E FECHAR)
+-- INTERFACE (COM BOTÃO DE AUMENTO)
 -- ============================================
 local gui = Instance.new("ScreenGui")
-gui.Name = "HitboxV12"
+gui.Name = "HitboxV14"
 gui.Parent = player:WaitForChild("PlayerGui")
 gui.ResetOnSpawn = false
 
 local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 280, 0, 190)
-main.Position = UDim2.new(0.5, -140, 0.1, 0)
+main.Size = UDim2.new(0, 260, 0, 200)
+main.Position = UDim2.new(0.5, -130, 0.1, 0)
 main.BackgroundColor3 = Color3.fromRGB(12, 12, 30)
 main.BackgroundTransparency = 0.05
 main.BorderSizePixel = 0
@@ -71,13 +103,13 @@ local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -60, 1, 0)
 title.Position = UDim2.new(0, 10, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "⚡ HITBOX V12"
+title.Text = "⚔️ HITBOX V14"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextScaled = true
 title.Font = Enum.Font.GothamBold
 title.Parent = header
 
--- Botão Minimizar (─)
+-- Botão Minimizar
 local btnMin = Instance.new("TextButton")
 btnMin.Size = UDim2.new(0, 25, 1, 0)
 btnMin.Position = UDim2.new(0.9, 0, 0, 0)
@@ -89,11 +121,7 @@ btnMin.Font = Enum.Font.GothamBold
 btnMin.BorderSizePixel = 0
 btnMin.Parent = header
 
-local btnMinCorner = Instance.new("UICorner")
-btnMinCorner.CornerRadius = UDim.new(0, 4)
-btnMinCorner.Parent = btnMin
-
--- Botão Fechar (✕)
+-- Botão Fechar
 local btnClose = Instance.new("TextButton")
 btnClose.Size = UDim2.new(0, 25, 1, 0)
 btnClose.Position = UDim2.new(0.96, 0, 0, 0)
@@ -105,13 +133,10 @@ btnClose.Font = Enum.Font.GothamBold
 btnClose.BorderSizePixel = 0
 btnClose.Parent = header
 
-local btnCloseCorner = Instance.new("UICorner")
-btnCloseCorner.CornerRadius = UDim.new(0, 4)
-btnCloseCorner.Parent = btnClose
-
 -- ============================================
--- CONTEÚDO (MESMO DE ANTES)
+-- CONTEÚDO
 -- ============================================
+-- Status
 local status = Instance.new("TextLabel")
 status.Size = UDim2.new(1, 0, 0, 20)
 status.Position = UDim2.new(0, 0, 0, 35)
@@ -122,6 +147,7 @@ status.TextScaled = true
 status.Font = Enum.Font.GothamBold
 status.Parent = main
 
+-- Contador de Players
 local counter = Instance.new("TextLabel")
 counter.Size = UDim2.new(1, 0, 0, 16)
 counter.Position = UDim2.new(0, 0, 0, 56)
@@ -132,10 +158,21 @@ counter.TextScaled = true
 counter.Font = Enum.Font.Gotham
 counter.Parent = main
 
+-- Indicador de item equipado
+local itemStatus = Instance.new("TextLabel")
+itemStatus.Size = UDim2.new(1, 0, 0, 16)
+itemStatus.Position = UDim2.new(0, 0, 0, 73)
+itemStatus.BackgroundTransparency = 1
+itemStatus.Text = "⚔️ Item: NENHUM"
+itemStatus.TextColor3 = Color3.fromRGB(255, 200, 100)
+itemStatus.TextScaled = true
+itemStatus.Font = Enum.Font.Gotham
+itemStatus.Parent = main
+
 -- Botões
 local btnAtivar = Instance.new("TextButton")
-btnAtivar.Size = UDim2.new(0.4, 0, 0, 30)
-btnAtivar.Position = UDim2.new(0.05, 0, 0, 76)
+btnAtivar.Size = UDim2.new(0.3, 0, 0, 30)
+btnAtivar.Position = UDim2.new(0.05, 0, 0, 93)
 btnAtivar.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
 btnAtivar.Text = "ATIVAR"
 btnAtivar.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -149,8 +186,8 @@ btnCorner1.CornerRadius = UDim.new(0, 6)
 btnCorner1.Parent = btnAtivar
 
 local btnScan = Instance.new("TextButton")
-btnScan.Size = UDim2.new(0.4, 0, 0, 30)
-btnScan.Position = UDim2.new(0.55, 0, 0, 76)
+btnScan.Size = UDim2.new(0.3, 0, 0, 30)
+btnScan.Position = UDim2.new(0.36, 0, 0, 93)
 btnScan.BackgroundColor3 = Color3.fromRGB(50, 50, 200)
 btnScan.Text = "SCAN"
 btnScan.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -163,54 +200,34 @@ local btnCorner2 = Instance.new("UICorner")
 btnCorner2.CornerRadius = UDim.new(0, 6)
 btnCorner2.Parent = btnScan
 
--- Slider
-local sliderFrame = Instance.new("Frame")
-sliderFrame.Size = UDim2.new(0.9, 0, 0, 30)
-sliderFrame.Position = UDim2.new(0.05, 0, 0, 112)
-sliderFrame.BackgroundTransparency = 1
-sliderFrame.Parent = main
+-- ============================================
+-- BOTÃO DE AUMENTAR HITBOX (NOVO!)
+-- ============================================
+local btnAumentar = Instance.new("TextButton")
+btnAumentar.Size = UDim2.new(0.2, 0, 0, 30)
+btnAumentar.Position = UDim2.new(0.72, 0, 0, 93)
+btnAumentar.BackgroundColor3 = Color3.fromRGB(150, 50, 255)
+btnAumentar.Text = "+"
+btnAumentar.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnAumentar.TextScaled = true
+btnAumentar.Font = Enum.Font.GothamBold
+btnAumentar.BorderSizePixel = 0
+btnAumentar.Parent = main
 
-local sliderLabel = Instance.new("TextLabel")
-sliderLabel.Size = UDim2.new(0.25, 0, 1, 0)
-sliderLabel.BackgroundTransparency = 1
-sliderLabel.Text = "2.0x"
-sliderLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-sliderLabel.TextScaled = true
-sliderLabel.Font = Enum.Font.GothamBold
-sliderLabel.Parent = sliderFrame
+local btnCorner3 = Instance.new("UICorner")
+btnCorner3.CornerRadius = UDim.new(0, 6)
+btnCorner3.Parent = btnAumentar
 
-local sliderBg = Instance.new("Frame")
-sliderBg.Size = UDim2.new(0.6, 0, 0.5, 0)
-sliderBg.Position = UDim2.new(0.32, 0, 0.25, 0)
-sliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-sliderBg.BorderSizePixel = 0
-sliderBg.Parent = sliderFrame
-
-local sliderBgCorner = Instance.new("UICorner")
-sliderBgCorner.CornerRadius = UDim.new(0, 4)
-sliderBgCorner.Parent = sliderBg
-
-local sliderBar = Instance.new("Frame")
-sliderBar.Size = UDim2.new(0.2, 0, 1, 0)
-sliderBar.BackgroundColor3 = Color3.fromRGB(150, 50, 255)
-sliderBar.BorderSizePixel = 0
-sliderBar.Parent = sliderBg
-
-local sliderBarCorner = Instance.new("UICorner")
-sliderBarCorner.CornerRadius = UDim.new(0, 4)
-sliderBarCorner.Parent = sliderBar
-
-local sliderBtn = Instance.new("TextButton")
-sliderBtn.Size = UDim2.new(0, 20, 2.5, 0)
-sliderBtn.Position = UDim2.new(0.5, -10, -0.75, 0)
-sliderBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-sliderBtn.Text = ""
-sliderBtn.BorderSizePixel = 0
-sliderBtn.Parent = sliderBar
-
-local sliderBtnCorner = Instance.new("UICorner")
-sliderBtnCorner.CornerRadius = UDim.new(0, 10)
-sliderBtnCorner.Parent = sliderBtn
+-- Informação do tamanho
+local tamanhoLabel = Instance.new("TextLabel")
+tamanhoLabel.Size = UDim2.new(0.9, 0, 0, 16)
+tamanhoLabel.Position = UDim2.new(0.05, 0, 0, 128)
+tamanhoLabel.BackgroundTransparency = 1
+tamanhoLabel.Text = "📏 Tamanho: 6.0"
+tamanhoLabel.TextColor3 = Color3.fromRGB(150, 150, 200)
+tamanhoLabel.TextScaled = true
+tamanhoLabel.Font = Enum.Font.Gotham
+tamanhoLabel.Parent = main
 
 -- Log
 local log = Instance.new("TextLabel")
@@ -222,16 +239,6 @@ log.TextColor3 = Color3.fromRGB(150, 150, 200)
 log.TextScaled = true
 log.Font = Enum.Font.Gotham
 log.Parent = main
-
--- ============================================
--- VARIÁVEIS
--- ============================================
-local ativo = false
-local alcance = 2.0
-local players = {}
-local mortos = {}
-local atacando = {}
-local minimizado = false
 
 -- ============================================
 -- FUNÇÕES PRINCIPAIS
@@ -255,6 +262,22 @@ local function scanearPlayers()
     log.Text = "✅ Scan: " .. #players .. " players"
 end
 
+-- ============================================
+-- ATUALIZAR STATUS DO ITEM
+-- ============================================
+local function atualizarItemStatus()
+    if temItemEquipado() then
+        itemStatus.Text = "⚔️ Item: EQUIPADO ✅"
+        itemStatus.TextColor3 = Color3.fromRGB(80, 255, 80)
+    else
+        itemStatus.Text = "⚔️ Item: NENHUM ❌"
+        itemStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+    end
+end
+
+-- ============================================
+-- CRIAR HITBOX
+-- ============================================
 local function criarHitboxPlayer(alvo)
     if mortos[alvo] then return end
     if not alvo or not alvo.Parent then return end
@@ -267,7 +290,7 @@ local function criarHitboxPlayer(alvo)
     
     local hitbox = Instance.new("Part")
     hitbox.Name = "HitboxBorda"
-    hitbox.Size = Vector3.new(6, 6, 6) * alcance
+    hitbox.Size = Vector3.new(tamanhoHitbox, tamanhoHitbox, tamanhoHitbox)
     hitbox.Position = root.Position
     hitbox.Anchored = true
     hitbox.CanCollide = false
@@ -290,6 +313,12 @@ local function criarHitboxPlayer(alvo)
         if not other or not other:IsDescendantOf(character) then return end
         if mortos[alvo] then return end
         
+        -- VERIFICA SE TEM ITEM EQUIPADO
+        if not temItemEquipado() then
+            log.Text = "⚠️ Equipe um item para dar dano!"
+            return
+        end
+        
         local hum = alvo:FindFirstChild("Humanoid")
         if not hum or hum.Health <= 0 then
             mortos[alvo] = true
@@ -302,7 +331,13 @@ local function criarHitboxPlayer(alvo)
         
         danoLoop = task.spawn(function()
             while ativo and not mortos[alvo] and hum and hum.Health > 0 do
-                local dano = 10 * alcance
+                -- Verifica novamente se tem item
+                if not temItemEquipado() then
+                    log.Text = "⚠️ Item perdido! Equipe novamente."
+                    break
+                end
+                
+                local dano = 10 * (tamanhoHitbox / 6) -- Dano escala com o tamanho
                 aplicarDano(alvo, dano)
                 
                 local nome = "Player"
@@ -352,6 +387,9 @@ end
 -- LOOP PRINCIPAL
 -- ============================================
 RunService.Heartbeat:Connect(function()
+    -- Atualiza status do item
+    atualizarItemStatus()
+    
     if not ativo then return end
     
     for i = #players, 1, -1 do
@@ -376,7 +414,7 @@ RunService.Heartbeat:Connect(function()
             local root = alvo:FindFirstChild("HumanoidRootPart") or alvo:FindFirstChild("Head")
             if root then
                 hitbox.Position = root.Position
-                hitbox.Size = Vector3.new(6, 6, 6) * alcance
+                hitbox.Size = Vector3.new(tamanhoHitbox, tamanhoHitbox, tamanhoHitbox)
             end
         elseif not mortos[alvo] then
             criarHitboxPlayer(alvo)
@@ -468,79 +506,63 @@ btnScan.MouseButton1Click:Connect(function()
 end)
 
 -- ============================================
--- SLIDER (FIX)
+-- BOTÃO AUMENTAR HITBOX
 -- ============================================
-local arrastando = false
-
-sliderBtn.MouseButton1Down:Connect(function()
-    arrastando = true
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        arrastando = false
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if arrastando and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local mouseX = input.Position.X
-        local pos = (mouseX - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X
-        pos = math.clamp(pos, 0, 1)
-        
-        sliderBar.Size = UDim2.new(pos, 0, 1, 0)
-        alcance = 1 + (pos * 8)
-        sliderLabel.Text = string.format("%.1fx", alcance)
-        
-        if ativo then
-            for _, alvo in pairs(players) do
-                local h = alvo:FindFirstChild("HitboxBorda")
-                if h then
-                    h.Size = Vector3.new(6, 6, 6) * alcance
-                end
+btnAumentar.MouseButton1Click:Connect(function()
+    -- Aumenta de 1 em 1, limite máximo 15
+    tamanhoHitbox = math.min(tamanhoHitbox + 1, 15)
+    tamanhoLabel.Text = "📏 Tamanho: " .. tamanhoHitbox
+    
+    -- Efeito visual no botão
+    btnAumentar.BackgroundColor3 = Color3.fromRGB(255, 100, 255)
+    task.wait(0.1)
+    btnAumentar.BackgroundColor3 = Color3.fromRGB(150, 50, 255)
+    
+    log.Text = "📏 Tamanho: " .. tamanhoHitbox
+    
+    -- Atualiza hitboxes existentes
+    if ativo then
+        for _, alvo in pairs(players) do
+            local h = alvo:FindFirstChild("HitboxBorda")
+            if h then
+                h.Size = Vector3.new(tamanhoHitbox, tamanhoHitbox, tamanhoHitbox)
             end
         end
     end
 end)
 
 -- ============================================
--- BOTÃO MINIMIZAR (─)
+-- MINIMIZAR E FECHAR
 -- ============================================
 btnMin.MouseButton1Click:Connect(function()
     minimizado = not minimizado
     
     if minimizado then
-        main.Size = UDim2.new(0, 280, 0, 30)
-        main.Position = UDim2.new(0.5, -140, 0, 0)
+        main.Size = UDim2.new(0, 260, 0, 30)
+        main.Position = UDim2.new(0.5, -130, 0, 0)
         
-        -- Esconde tudo menos o header
         for _, child in pairs(main:GetChildren()) do
             if child ~= header then
                 child.Visible = false
             end
         end
         
-        btnMin.Text = "□" -- Maximizar
+        btnMin.Text = "□"
         log.Text = "📝 Minimizado"
     else
-        main.Size = UDim2.new(0, 280, 0, 190)
-        main.Position = UDim2.new(0.5, -140, 0.1, 0)
+        main.Size = UDim2.new(0, 260, 0, 200)
+        main.Position = UDim2.new(0.5, -130, 0.1, 0)
         
-        -- Mostra tudo
         for _, child in pairs(main:GetChildren()) do
             child.Visible = true
         end
         
-        btnMin.Text = "─" -- Minimizar
+        btnMin.Text = "─"
         log.Text = "📝 Restaurado"
     end
 end)
 
--- ============================================
--- BOTÃO FECHAR (✕)
--- ============================================
 btnClose.MouseButton1Click:Connect(function()
-    -- Desativa tudo antes de fechar
     if ativo then
         ativo = false
         for _, alvo in pairs(players) do
@@ -550,10 +572,25 @@ btnClose.MouseButton1Click:Connect(function()
         atacando = {}
     end
     
-    -- Remove a GUI
     gui:Destroy()
-    
     print("❌ Script encerrado")
+end)
+
+-- ============================================
+-- DETECTAR MUDANÇA DE ITEM (EQUIPAR/DESEQUIPAR)
+-- ============================================
+character.ChildAdded:Connect(function(child)
+    if child:IsA("Tool") then
+        atualizarItemStatus()
+        log.Text = "⚔️ Item equipado: " .. child.Name
+    end
+end)
+
+character.ChildRemoved:Connect(function(child)
+    if child:IsA("Tool") then
+        atualizarItemStatus()
+        log.Text = "❌ Item removido"
+    end
 end)
 
 -- ============================================
@@ -561,10 +598,12 @@ end)
 -- ============================================
 task.wait(0.5)
 scanearPlayers()
+atualizarItemStatus()
+
 print("========================================")
-print("⚡ HITBOX V12 - COM MINIMIZAR!")
-print("✅ Botão ─ para minimizar")
-print("✅ Botão ✕ para fechar")
-print("✅ Slider funcionando")
-print("✅ Modo PLAYERS")
+print("⚔️ HITBOX V14 - COM ITENS!")
+print("✅ Equipe um item para dar dano")
+print("✅ Botão + aumenta a hitbox (limite 15)")
+print("✅ SCAN para encontrar players")
+print("✅ ATIVAR para criar hitboxes")
 print("========================================")
