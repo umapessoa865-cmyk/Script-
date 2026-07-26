@@ -1,0 +1,117 @@
+-- Aimbot de Teste (para testar anti-aimbot)
+-- Cole no Delta e execute
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- ======================
+-- CONFIGURAÇÕES
+-- ======================
+local FOV = 180                -- Campo de visão do aimbot (180 = quase tela inteira)
+local TeamCheck = true         -- true = não mira em aliados
+local WallCheck = false        -- true = só mira se tiver linha de visão
+local AimPart = "Head"         -- "Head" ou "HumanoidRootPart"
+local Smoothness = 1           -- 1 = travamento instantâneo | quanto maior, mais suave
+local ToggleKey = Enum.KeyCode.Q  -- Tecla para ligar/desligar
+
+-- ======================
+-- VARIÁVEIS
+-- ======================
+local AimbotEnabled = true
+local Holding = false
+
+-- Desenha o círculo do FOV (opcional, só para visualizar)
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1
+FOVCircle.NumSides = 64
+FOVCircle.Radius = FOV
+FOVCircle.Filled = false
+FOVCircle.Color = Color3.fromRGB(255, 255, 255)
+FOVCircle.Visible = true
+FOVCircle.Transparency = 0.7
+
+-- ======================
+-- FUNÇÕES
+-- ======================
+local function GetClosestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = FOV
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            
+            -- Team Check
+            if TeamCheck and player.Team == LocalPlayer.Team then
+                continue
+            end
+
+            local targetPart = player.Character:FindFirstChild(AimPart)
+            if not targetPart then continue end
+
+            local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+            
+            if onScreen then
+                local mousePos = UserInputService:GetMouseLocation()
+                local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+
+                if distance < shortestDistance then
+                    -- Wall Check (opcional)
+                    if WallCheck then
+                        local ray = Ray.new(Camera.CFrame.Position, (targetPart.Position - Camera.CFrame.Position).Unit * 500)
+                        local hit = workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character, Camera})
+                        if hit and hit:IsDescendantOf(player.Character) then
+                            closestPlayer = player
+                            shortestDistance = distance
+                        end
+                    else
+                        closestPlayer = player
+                        shortestDistance = distance
+                    end
+                end
+            end
+        end
+    end
+
+    return closestPlayer
+end
+
+-- ======================
+-- LOOP PRINCIPAL
+-- ======================
+RunService.RenderStepped:Connect(function()
+    -- Atualiza o círculo do FOV
+    FOVCircle.Position = UserInputService:GetMouseLocation()
+    FOVCircle.Radius = FOV
+
+    if not AimbotEnabled then return end
+
+    local target = GetClosestPlayer()
+    
+    if target and target.Character and target.Character:FindFirstChild(AimPart) then
+        local targetPos = target.Character[AimPart].Position
+        
+        -- Calcula a nova CFrame da câmera
+        local newCFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+        
+        -- Aplica com smoothness
+        Camera.CFrame = Camera.CFrame:Lerp(newCFrame, 1 / Smoothness)
+    end
+end)
+
+-- ======================
+-- TOGGLE (Ligar/Desligar)
+-- ======================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == ToggleKey then
+        AimbotEnabled = not AimbotEnabled
+        FOVCircle.Color = AimbotEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+        print("Aimbot:", AimbotEnabled and "ATIVADO" or "DESATIVADO")
+    end
+end)
+
+print("Aimbot carregado! Tecla Q para ligar/desligar")
