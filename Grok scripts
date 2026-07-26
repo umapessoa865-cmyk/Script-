@@ -1,0 +1,164 @@
+-- Speed & JumpPower GUI | Delta Executor Compatible
+-- Cole este script inteiro no executor e execute
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local Player = Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+
+-- Configurações padrão
+local CurrentSpeed = 16
+local CurrentJump = 50
+
+-- Função para atualizar o personagem quando ele respawnar
+local function onCharacterAdded(char)
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid")
+    
+    -- Aplica os valores atuais novamente
+    Humanoid.WalkSpeed = CurrentSpeed
+    Humanoid.JumpPower = CurrentJump
+end
+
+Player.CharacterAdded:Connect(onCharacterAdded)
+
+-- Cria a GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SpeedJumpGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+
+-- Frame principal
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 220, 0, 160)
+MainFrame.Position = UDim2.new(0.5, -110, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(0, 170, 255)
+UIStroke.Thickness = 2
+UIStroke.Parent = MainFrame
+
+-- Título
+local Title = Instance.new("TextLabel")
+Title.Name = "Title"
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
+Title.BorderSizePixel = 0
+Title.Text = "Speed & Jump"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = Title
+
+-- Botão Speed
+local SpeedButton = Instance.new("TextButton")
+SpeedButton.Name = "SpeedButton"
+SpeedButton.Size = UDim2.new(0.9, 0, 0, 40)
+SpeedButton.Position = UDim2.new(0.05, 0, 0, 50)
+SpeedButton.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+SpeedButton.BorderSizePixel = 0
+SpeedButton.Text = "Speed: 16"
+SpeedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedButton.Font = Enum.Font.Gotham
+SpeedButton.TextSize = 15
+SpeedButton.Parent = MainFrame
+
+local SpeedCorner = Instance.new("UICorner")
+SpeedCorner.CornerRadius = UDim.new(0, 8)
+SpeedCorner.Parent = SpeedButton
+
+-- Botão JumpPower
+local JumpButton = Instance.new("TextButton")
+JumpButton.Name = "JumpButton"
+JumpButton.Size = UDim2.new(0.9, 0, 0, 40)
+JumpButton.Position = UDim2.new(0.05, 0, 0, 100)
+JumpButton.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+JumpButton.BorderSizePixel = 0
+JumpButton.Text = "Jump: 50"
+JumpButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+JumpButton.Font = Enum.Font.Gotham
+JumpButton.TextSize = 15
+JumpButton.Parent = MainFrame
+
+local JumpCorner = Instance.new("UICorner")
+JumpCorner.CornerRadius = UDim.new(0, 8)
+JumpCorner.Parent = JumpButton
+
+-- Valores possíveis
+local SpeedValues = {16, 50, 80, 120, 200}
+local JumpValues = {50, 100, 150, 200, 300}
+
+local SpeedIndex = 1
+local JumpIndex = 1
+
+-- Função de clique no Speed
+SpeedButton.MouseButton1Click:Connect(function()
+    SpeedIndex = SpeedIndex % #SpeedValues + 1
+    CurrentSpeed = SpeedValues[SpeedIndex]
+    
+    if Humanoid then
+        Humanoid.WalkSpeed = CurrentSpeed
+    end
+    
+    SpeedButton.Text = "Speed: " .. CurrentSpeed
+    
+    -- Efeito visual
+    TweenService:Create(SpeedButton, TweenInfo.new(0.1), {
+        BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    }):Play()
+    
+    task.wait(0.15)
+    
+    TweenService:Create(SpeedButton, TweenInfo.new(0.1), {
+        BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    }):Play()
+end)
+
+-- Função de clique no Jump
+JumpButton.MouseButton1Click:Connect(function()
+    JumpIndex = JumpIndex % #JumpValues + 1
+    CurrentJump = JumpValues[JumpIndex]
+    
+    if Humanoid then
+        Humanoid.JumpPower = CurrentJump
+    end
+    
+    JumpButton.Text = "Jump: " .. CurrentJump
+    
+    -- Efeito visual
+    TweenService:Create(JumpButton, TweenInfo.new(0.1), {
+        BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    }):Play()
+    
+    task.wait(0.15)
+    
+    TweenService:Create(JumpButton, TweenInfo.new(0.1), {
+        BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    }):Play()
+end)
+
+-- Aplica os valores iniciais
+if Humanoid then
+    Humanoid.WalkSpeed = CurrentSpeed
+    Humanoid.JumpPower = CurrentJump
+end
+
+print("[Speed & Jump] GUI carregada com sucesso!")
