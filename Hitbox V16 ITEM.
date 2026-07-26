@@ -1,0 +1,428 @@
+-- HITBOX V16 - HITBOX DE ITEM! ⚽
+-- Funciona em qualquer item (bola, objeto, etc.)
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+
+-- ============================================
+-- VARIÁVEIS
+-- ============================================
+local ativo = false
+local itemAlvo = nil
+local hitboxAtiva = nil
+local minimizado = false
+
+-- ============================================
+-- FUNÇÃO: ENCONTRAR ITEM (BOLA, OBJETO, ETC)
+-- ============================================
+local function encontrarItem()
+    -- Procura por objetos comuns em jogos
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("Model") then
+            local nome = obj.Name:lower()
+            
+            -- Palavras-chave para encontrar a bola/item
+            if nome:find("ball") or 
+               nome:find("bola") or 
+               nome:find("item") or 
+               nome:find("object") or
+               nome:find("pickup") or
+               nome:find("collect") or
+               nome:find("orb") or
+               nome:find("sphere") or
+               nome:find("circle") or
+               nome:find("target") then
+                return obj
+            end
+        end
+    end
+    return nil
+end
+
+-- ============================================
+-- FUNÇÃO: CRIAR HITBOX NO ITEM
+-- ============================================
+local function criarHitboxItem(item)
+    if not item then return end
+    
+    -- Remove hitbox antiga
+    local antiga = item:FindFirstChild("HitboxBorda")
+    if antiga then antiga:Destroy() end
+    
+    -- Determina a posição do item
+    local posicao
+    if item:IsA("BasePart") then
+        posicao = item.Position
+    elseif item:IsA("Model") then
+        local root = item:FindFirstChild("HumanoidRootPart") or item:FindFirstChild("Head") or item.PrimaryPart
+        if root then
+            posicao = root.Position
+        else
+            -- Tenta pegar a posição de qualquer parte
+            for _, part in pairs(item:GetChildren()) do
+                if part:IsA("BasePart") then
+                    posicao = part.Position
+                    break
+                end
+            end
+        end
+    end
+    
+    if not posicao then return end
+    
+    -- Cria a hitbox (tamanho fixo 5)
+    local hitbox = Instance.new("Part")
+    hitbox.Name = "HitboxBorda"
+    hitbox.Size = Vector3.new(5, 5, 5)
+    hitbox.Position = posicao
+    hitbox.Anchored = true
+    hitbox.CanCollide = false
+    hitbox.Transparency = 0.3
+    hitbox.BrickColor = BrickColor.new("Bright red")
+    hitbox.Material = Enum.Material.Neon
+    hitbox.Parent = item
+    
+    -- Highlight para ficar mais visível
+    local highlight = Instance.new("Highlight")
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.FillTransparency = 0.4
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineTransparency = 0.3
+    highlight.Parent = hitbox
+    
+    -- Efeito de brilho
+    local att = Instance.new("Attachment")
+    att.Parent = hitbox
+    
+    local beam = Instance.new("Beam")
+    beam.Attachment0 = att
+    beam.Color = ColorSequence.new(Color3.fromRGB(255, 0, 0))
+    beam.Width0 = 2
+    beam.Width1 = 2
+    beam.Transparency = NumberSequence.new(0.5)
+    beam.Parent = hitbox
+    
+    hitboxAtiva = hitbox
+    return hitbox
+end
+
+-- ============================================
+-- FUNÇÃO: ATUALIZAR POSIÇÃO DA HITBOX
+-- ============================================
+local function atualizarHitbox()
+    if not ativo or not itemAlvo then
+        if hitboxAtiva then
+            hitboxAtiva:Destroy()
+            hitboxAtiva = nil
+        end
+        return
+    end
+    
+    if not hitboxAtiva or not hitboxAtiva.Parent then
+        criarHitboxItem(itemAlvo)
+        return
+    end
+    
+    -- Atualiza a posição do item
+    local posicao
+    if itemAlvo:IsA("BasePart") then
+        posicao = itemAlvo.Position
+    elseif itemAlvo:IsA("Model") then
+        local root = itemAlvo:FindFirstChild("HumanoidRootPart") or itemAlvo:FindFirstChild("Head") or itemAlvo.PrimaryPart
+        if root then
+            posicao = root.Position
+        else
+            for _, part in pairs(itemAlvo:GetChildren()) do
+                if part:IsA("BasePart") then
+                    posicao = part.Position
+                    break
+                end
+            end
+        end
+    end
+    
+    if posicao then
+        hitboxAtiva.Position = posicao
+    end
+end
+
+-- ============================================
+-- INTERFACE SIMPLES
+-- ============================================
+local gui = Instance.new("ScreenGui")
+gui.Name = "HitboxItem"
+gui.Parent = player:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 250, 0, 140)
+main.Position = UDim2.new(0.5, -125, 0.1, 0)
+main.BackgroundColor3 = Color3.fromRGB(12, 12, 30)
+main.BackgroundTransparency = 0.05
+main.BorderSizePixel = 0
+main.Parent = gui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = main
+
+-- TOPO
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 30)
+header.BackgroundColor3 = Color3.fromRGB(20, 10, 40)
+header.BackgroundTransparency = 0.3
+header.BorderSizePixel = 0
+header.Parent = main
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -60, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "⚡ HITBOX ITEM"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Parent = header
+
+-- Botão Minimizar
+local btnMin = Instance.new("TextButton")
+btnMin.Size = UDim2.new(0, 25, 1, 0)
+btnMin.Position = UDim2.new(0.9, 0, 0, 0)
+btnMin.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+btnMin.Text = "─"
+btnMin.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnMin.TextScaled = true
+btnMin.Font = Enum.Font.GothamBold
+btnMin.BorderSizePixel = 0
+btnMin.Parent = header
+
+-- Botão Fechar
+local btnClose = Instance.new("TextButton")
+btnClose.Size = UDim2.new(0, 25, 1, 0)
+btnClose.Position = UDim2.new(0.96, 0, 0, 0)
+btnClose.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+btnClose.Text = "✕"
+btnClose.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnClose.TextScaled = true
+btnClose.Font = Enum.Font.GothamBold
+btnClose.BorderSizePixel = 0
+btnClose.Parent = header
+
+-- Status
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(1, 0, 0, 20)
+status.Position = UDim2.new(0, 0, 0, 35)
+status.BackgroundTransparency = 1
+status.Text = "🔴 DESATIVADO"
+status.TextColor3 = Color3.fromRGB(255, 80, 80)
+status.TextScaled = true
+status.Font = Enum.Font.GothamBold
+status.Parent = main
+
+-- Item detectado
+local itemStatus = Instance.new("TextLabel")
+itemStatus.Size = UDim2.new(1, 0, 0, 16)
+itemStatus.Position = UDim2.new(0, 0, 0, 56)
+itemStatus.BackgroundTransparency = 1
+itemStatus.Text = "📦 Item: NENHUM"
+itemStatus.TextColor3 = Color3.fromRGB(255, 200, 100)
+itemStatus.TextScaled = true
+itemStatus.Font = Enum.Font.Gotham
+itemStatus.Parent = main
+
+-- ============================================
+-- BOTÃO ÚNICO (ATIVAR/DESATIVAR)
+-- ============================================
+local btnToggle = Instance.new("TextButton")
+btnToggle.Size = UDim2.new(0.8, 0, 0, 35)
+btnToggle.Position = UDim2.new(0.1, 0, 0, 80)
+btnToggle.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+btnToggle.Text = "🔥 ATIVAR HITBOX"
+btnToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnToggle.TextScaled = true
+btnToggle.Font = Enum.Font.GothamBold
+btnToggle.BorderSizePixel = 0
+btnToggle.Parent = main
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 8)
+btnCorner.Parent = btnToggle
+
+-- Log
+local log = Instance.new("TextLabel")
+log.Size = UDim2.new(0.9, 0, 0, 16)
+log.Position = UDim2.new(0.05, 0, 0, 120)
+log.BackgroundTransparency = 1
+log.Text = "📝 Procurando item..."
+log.TextColor3 = Color3.fromRGB(150, 150, 200)
+log.TextScaled = true
+log.Font = Enum.Font.Gotham
+log.Parent = main
+
+-- ============================================
+-- FUNÇÃO: PROCURAR ITEM E ATUALIZAR STATUS
+-- ============================================
+local function procurarItem()
+    local item = encontrarItem()
+    if item then
+        itemAlvo = item
+        itemStatus.Text = "📦 Item: " .. item.Name
+        itemStatus.TextColor3 = Color3.fromRGB(80, 255, 80)
+        log.Text = "✅ Item encontrado: " .. item.Name
+        print("🎯 Item encontrado: " .. item.Name)
+        
+        if ativo then
+            criarHitboxItem(item)
+        end
+    else
+        itemAlvo = nil
+        itemStatus.Text = "📦 Item: NENHUM"
+        itemStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        log.Text = "❌ Nenhum item encontrado"
+        print("❌ Nenhum item encontrado")
+    end
+end
+
+-- ============================================
+-- LOOP DE ATUALIZAÇÃO
+-- ============================================
+RunService.Heartbeat:Connect(function()
+    if ativo and itemAlvo then
+        atualizarHitbox()
+    end
+end)
+
+-- ============================================
+-- DETECTAR QUANDO O ITEM MUDA
+-- ============================================
+-- Procura por novos itens a cada 2 segundos
+task.spawn(function()
+    while true do
+        task.wait(2)
+        if not ativo then
+            -- Se estiver desativado, só atualiza o status
+            local item = encontrarItem()
+            if item then
+                itemAlvo = item
+                itemStatus.Text = "📦 Item: " .. item.Name
+                itemStatus.TextColor3 = Color3.fromRGB(80, 255, 80)
+            end
+        end
+    end
+end)
+
+-- Detecta quando algo entra no Workspace
+Workspace.ChildAdded:Connect(function(child)
+    task.wait(0.5)
+    if child:IsA("BasePart") or child:IsA("Model") then
+        local nome = child.Name:lower()
+        if nome:find("ball") or nome:find("bola") or nome:find("item") or 
+           nome:find("object") or nome:find("pickup") or nome:find("collect") then
+            procurarItem()
+        end
+    end
+end)
+
+-- ============================================
+-- BOTÃO ATIVAR/DESATIVAR
+-- ============================================
+btnToggle.MouseButton1Click:Connect(function()
+    ativo = not ativo
+    
+    if ativo then
+        btnToggle.Text = "⛔ DESATIVAR HITBOX"
+        btnToggle.BackgroundColor3 = Color3.fromRGB(40, 200, 40)
+        status.Text = "🟢 ATIVADO"
+        status.TextColor3 = Color3.fromRGB(80, 255, 80)
+        
+        -- Procura o item se não tiver
+        if not itemAlvo then
+            procurarItem()
+        end
+        
+        if itemAlvo then
+            criarHitboxItem(itemAlvo)
+            log.Text = "🔥 Hitbox ativada no item!"
+            print("🔥 Hitbox ativada em: " .. itemAlvo.Name)
+        else
+            log.Text = "⚠️ Nenhum item encontrado!"
+            ativo = false
+            btnToggle.Text = "🔥 ATIVAR HITBOX"
+            btnToggle.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+            status.Text = "🔴 DESATIVADO"
+            status.TextColor3 = Color3.fromRGB(255, 80, 80)
+        end
+    else
+        btnToggle.Text = "🔥 ATIVAR HITBOX"
+        btnToggle.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+        status.Text = "🔴 DESATIVADO"
+        status.TextColor3 = Color3.fromRGB(255, 80, 80)
+        
+        if hitboxAtiva then
+            hitboxAtiva:Destroy()
+            hitboxAtiva = nil
+        end
+        log.Text = "❌ Hitbox desativada"
+        print("❌ Hitbox desativada")
+    end
+end)
+
+-- ============================================
+-- MINIMIZAR E FECHAR
+-- ============================================
+btnMin.MouseButton1Click:Connect(function()
+    minimizado = not minimizado
+    
+    if minimizado then
+        main.Size = UDim2.new(0, 250, 0, 30)
+        main.Position = UDim2.new(0.5, -125, 0, 0)
+        
+        for _, child in pairs(main:GetChildren()) do
+            if child ~= header then
+                child.Visible = false
+            end
+        end
+        
+        btnMin.Text = "□"
+    else
+        main.Size = UDim2.new(0, 250, 0, 140)
+        main.Position = UDim2.new(0.5, -125, 0.1, 0)
+        
+        for _, child in pairs(main:GetChildren()) do
+            child.Visible = true
+        end
+        
+        btnMin.Text = "─"
+    end
+end)
+
+btnClose.MouseButton1Click:Connect(function()
+    if ativo then
+        ativo = false
+        if hitboxAtiva then
+            hitboxAtiva:Destroy()
+            hitboxAtiva = nil
+        end
+    end
+    
+    gui:Destroy()
+    print("❌ Script encerrado")
+end)
+
+-- ============================================
+-- INICIAR
+-- ============================================
+task.wait(0.5)
+procurarItem()
+
+print("========================================")
+print("⚡ HITBOX DE ITEM V16!")
+print("✅ Procura automaticamente por itens")
+print("✅ Botão único para ATIVAR/DESATIVAR")
+print("✅ Hitbox vermelha em volta do item")
+print("========================================")
