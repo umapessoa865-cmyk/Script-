@@ -1,0 +1,599 @@
+-- HITBOX V10 - MODO PLAYER 👥
+-- Teste em servidor privado com amigos
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+
+-- ============================================
+-- DETECTOR DE SISTEMA DE DANO
+-- ============================================
+local sistemaDano = { tipo = "humanoid", remote = nil, atributo = nil }
+
+local function detectarRemotes()
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            local nome = obj.Name:lower()
+            if nome:find("damage") or nome:find("attack") or nome:find("hit") or 
+               nome:find("combat") or nome:find("enemy") or nome:find("monster") then
+                return obj
+            end
+        end
+    end
+    return nil
+end
+
+local remote = detectarRemotes()
+if remote then
+    sistemaDano.tipo = "remote"
+    sistemaDano.remote = remote
+else
+    sistemaDano.tipo = "humanoid"
+end
+
+print("✅ Sistema de dano: " .. sistemaDano.tipo)
+
+-- ============================================
+-- FUNÇÃO DE DANO EM PLAYERS
+-- ============================================
+local function aplicarDano(alvo, quantidade)
+    if not alvo then return false end
+    
+    local hum = alvo:FindFirstChild("Humanoid")
+    if not hum then return false end
+
+    -- Método 1: Humanoid direto
+    if sistemaDano.tipo == "humanoid" then
+        pcall(function() hum.Health = hum.Health - quantidade end)
+        return true
+    end
+    
+    -- Método 2: RemoteEvent (se detectado)
+    if sistemaDano.tipo == "remote" and sistemaDano.remote then
+        pcall(function()
+            if sistemaDano.remote:IsA("RemoteEvent") then
+                sistemaDano.remote:FireServer(quantidade, alvo)
+            else
+                sistemaDano.remote:InvokeServer(quantidade, alvo)
+            end
+        end)
+        return true
+    end
+    
+    -- Método 3: Tentar todos os remotes (fallback)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            pcall(function() obj:FireServer(quantidade, alvo) end)
+        end
+    end
+    
+    return false
+end
+
+-- ============================================
+-- INTERFACE PREMIUM
+-- ============================================
+local gui = Instance.new("ScreenGui")
+gui.Name = "HitboxPlayer"
+gui.Parent = player:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+
+-- Frame principal
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 310, 0, 230)
+main.Position = UDim2.new(0.5, -155, 0.1, 0)
+main.BackgroundColor3 = Color3.fromRGB(12, 12, 30)
+main.BackgroundTransparency = 0.05
+main.BorderSizePixel = 0
+main.ClipsDescendants = true
+main.Parent = gui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = main
+
+-- Topo
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 45)
+header.BackgroundColor3 = Color3.fromRGB(20, 10, 40)
+header.BorderSizePixel = 0
+header.Parent = main
+
+local headerCorner = Instance.new("UICorner")
+headerCorner.CornerRadius = UDim.new(0, 12)
+headerCorner.Parent = header
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 1, 0)
+title.BackgroundTransparency = 1
+title.Text = "👥 HITBOX PLAYER"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Parent = header
+
+local subTitle = Instance.new("TextLabel")
+subTitle.Size = UDim2.new(1, 0, 0, 14)
+subTitle.Position = UDim2.new(0, 0, 0, 32)
+subTitle.BackgroundTransparency = 1
+subTitle.Text = "🎯 MODO: PLAYERS"
+subTitle.TextColor3 = Color3.fromRGB(150, 100, 255)
+subTitle.TextScaled = true
+subTitle.Font = Enum.Font.GothamBold
+subTitle.Parent = main
+
+-- Status
+local statusFrame = Instance.new("Frame")
+statusFrame.Size = UDim2.new(0.5, -5, 0, 25)
+statusFrame.Position = UDim2.new(0.025, 0, 0, 50)
+statusFrame.BackgroundTransparency = 1
+statusFrame.Parent = main
+
+local statusIcon = Instance.new("TextLabel")
+statusIcon.Size = UDim2.new(0, 20, 1, 0)
+statusIcon.BackgroundTransparency = 1
+statusIcon.Text = "🔴"
+statusIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+statusIcon.TextScaled = true
+statusIcon.Font = Enum.Font.GothamBold
+statusIcon.Parent = statusFrame
+
+local statusText = Instance.new("TextLabel")
+statusText.Size = UDim2.new(1, -25, 1, 0)
+statusText.Position = UDim2.new(0, 22, 0, 0)
+statusText.BackgroundTransparency = 1
+statusText.Text = "DESATIVADO"
+statusText.TextColor3 = Color3.fromRGB(255, 80, 80)
+statusText.TextScaled = true
+statusText.Font = Enum.Font.GothamBold
+statusText.Parent = statusFrame
+
+-- Contador de Players
+local playerFrame = Instance.new("Frame")
+playerFrame.Size = UDim2.new(0.45, -5, 0, 25)
+playerFrame.Position = UDim2.new(0.525, 0, 0, 50)
+playerFrame.BackgroundTransparency = 1
+playerFrame.Parent = main
+
+local playerIcon = Instance.new("TextLabel")
+playerIcon.Size = UDim2.new(0, 20, 1, 0)
+playerIcon.BackgroundTransparency = 1
+playerIcon.Text = "👤"
+playerIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+playerIcon.TextScaled = true
+playerIcon.Font = Enum.Font.GothamBold
+playerIcon.Parent = playerFrame
+
+local playerText = Instance.new("TextLabel")
+playerText.Size = UDim2.new(1, -25, 1, 0)
+playerText.Position = UDim2.new(0, 22, 0, 0)
+playerText.BackgroundTransparency = 1
+playerText.Text = "Players: 0"
+playerText.TextColor3 = Color3.fromRGB(150, 200, 255)
+playerText.TextScaled = true
+playerText.Font = Enum.Font.GothamBold
+playerText.Parent = playerFrame
+
+-- Botões
+local function criarBotao(x, cor, texto, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.43, 0, 0, 30)
+    btn.Position = UDim2.new(x, 0, 0, 80)
+    btn.BackgroundColor3 = cor
+    btn.Text = texto
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextScaled = true
+    btn.Font = Enum.Font.GothamBold
+    btn.BorderSizePixel = 0
+    btn.Parent = main
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 6)
+    btnCorner.Parent = btn
+    
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+local btnAtivar = criarBotao(0.04, Color3.fromRGB(200, 40, 40), "ATIVAR", function()
+    ativo = not ativo
+    if ativo then
+        btnAtivar.Text = "DESATIVAR"
+        btnAtivar.BackgroundColor3 = Color3.fromRGB(40, 200, 40)
+        statusIcon.Text = "🟢"
+        statusText.Text = "ATIVADO"
+        statusText.TextColor3 = Color3.fromRGB(80, 255, 80)
+        scanearPlayers()
+        for _, alvo in pairs(players) do criarHitboxPlayer(alvo) end
+        logText.Text = "✅ Ativado (" .. #players .. " players)"
+        notificar("🔥 Hitbox ativada em players!", Color3.fromRGB(80, 255, 80))
+    else
+        btnAtivar.Text = "ATIVAR"
+        btnAtivar.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+        statusIcon.Text = "🔴"
+        statusText.Text = "DESATIVADO"
+        statusText.TextColor3 = Color3.fromRGB(255, 80, 80)
+        for _, alvo in pairs(players) do
+            local h = alvo:FindFirstChild("HitboxBorda")
+            if h then h:Destroy() end
+        end
+        atacando = {}
+        logText.Text = "❌ Desativado"
+        notificar("❌ Hitbox desativada", Color3.fromRGB(255, 80, 80))
+    end
+end)
+
+local btnScan = criarBotao(0.53, Color3.fromRGB(50, 50, 200), "SCANEAR", function()
+    logText.Text = "🔍 Scanear players..."
+    scanearPlayers()
+    if ativo then
+        for _, alvo in pairs(players) do criarHitboxPlayer(alvo) end
+    end
+    notificar("✅ " .. #players .. " players encontrados", Color3.fromRGB(80, 200, 255))
+    statusIcon.Text = "✅"
+    statusText.Text = #players .. " players"
+    statusText.TextColor3 = Color3.fromRGB(80, 200, 255)
+    task.wait(0.8)
+    if ativo then
+        statusIcon.Text = "🟢"
+        statusText.Text = "ATIVADO"
+        statusText.TextColor3 = Color3.fromRGB(80, 255, 80)
+    else
+        statusIcon.Text = "🔴"
+        statusText.Text = "DESATIVADO"
+        statusText.TextColor3 = Color3.fromRGB(255, 80, 80)
+    end
+end)
+
+-- Slider
+local sliderFrame = Instance.new("Frame")
+sliderFrame.Size = UDim2.new(0.92, 0, 0, 35)
+sliderFrame.Position = UDim2.new(0.04, 0, 0, 115)
+sliderFrame.BackgroundTransparency = 1
+sliderFrame.Parent = main
+
+local sliderLabel = Instance.new("TextLabel")
+sliderLabel.Size = UDim2.new(0.25, 0, 1, 0)
+sliderLabel.BackgroundTransparency = 1
+sliderLabel.Text = "2.0x"
+sliderLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+sliderLabel.TextScaled = true
+sliderLabel.Font = Enum.Font.GothamBold
+sliderLabel.Parent = sliderFrame
+
+local sliderBg = Instance.new("Frame")
+sliderBg.Size = UDim2.new(0.6, 0, 0.5, 0)
+sliderBg.Position = UDim2.new(0.32, 0, 0.25, 0)
+sliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+sliderBg.BorderSizePixel = 0
+sliderBg.Parent = sliderFrame
+
+local sliderBar = Instance.new("Frame")
+sliderBar.Size = UDim2.new(0.2, 0, 1, 0)
+sliderBar.BackgroundColor3 = Color3.fromRGB(150, 50, 255)
+sliderBar.BorderSizePixel = 0
+sliderBar.Parent = sliderBg
+
+local sliderThumb = Instance.new("Frame")
+sliderThumb.Size = UDim2.new(0, 20, 2, 0)
+sliderThumb.Position = UDim2.new(0.5, -10, -0.5, 0)
+sliderThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+sliderThumb.BorderSizePixel = 0
+sliderThumb.Parent = sliderBar
+
+local thumbCorner = Instance.new("UICorner")
+thumbCorner.CornerRadius = UDim.new(0, 10)
+thumbCorner.Parent = sliderThumb
+
+-- Log
+local logFrame = Instance.new("Frame")
+logFrame.Size = UDim2.new(0.92, 0, 0, 20)
+logFrame.Position = UDim2.new(0.04, 0, 0, 155)
+logFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 35)
+logFrame.BackgroundTransparency = 0.3
+logFrame.BorderSizePixel = 0
+logFrame.Parent = main
+
+local logText = Instance.new("TextLabel")
+logText.Size = UDim2.new(1, -10, 1, 0)
+logText.Position = UDim2.new(0, 5, 0, 0)
+logText.BackgroundTransparency = 1
+logText.Text = "📝 Pronto para usar (modo players)"
+logText.TextColor3 = Color3.fromRGB(150, 150, 200)
+logText.TextScaled = true
+logText.Font = Enum.Font.Gotham
+logText.Parent = logFrame
+
+-- Alvo específico (opcional)
+local targetFrame = Instance.new("Frame")
+targetFrame.Size = UDim2.new(0.92, 0, 0, 20)
+targetFrame.Position = UDim2.new(0.04, 0, 0, 178)
+targetFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 35)
+targetFrame.BackgroundTransparency = 0.3
+targetFrame.BorderSizePixel = 0
+targetFrame.Parent = main
+
+local targetText = Instance.new("TextLabel")
+targetText.Size = UDim2.new(1, -10, 1, 0)
+targetText.Position = UDim2.new(0, 5, 0, 0)
+targetText.BackgroundTransparency = 1
+targetText.Text = "🎯 Alvo: Nenhum selecionado"
+targetText.TextColor3 = Color3.fromRGB(200, 200, 100)
+targetText.TextScaled = true
+targetText.Font = Enum.Font.Gotham
+targetText.Parent = targetFrame
+
+-- Notificações
+local notificacoes = {}
+
+local function notificar(texto, cor)
+    local notif = Instance.new("Frame")
+    notif.Size = UDim2.new(0, 280, 0, 35)
+    notif.Position = UDim2.new(1, 10, 0, #notificacoes * 42 + 10)
+    notif.BackgroundColor3 = Color3.fromRGB(10, 10, 30)
+    notif.BackgroundTransparency = 0.05
+    notif.BorderSizePixel = 0
+    notif.Parent = gui
+
+    local notifCorner = Instance.new("UICorner")
+    notifCorner.CornerRadius = UDim.new(0, 8)
+    notifCorner.Parent = notif
+
+    local notifBorder = Instance.new("Frame")
+    notifBorder.Size = UDim2.new(1, 0, 1, 0)
+    notifBorder.BackgroundTransparency = 1
+    notifBorder.BorderSizePixel = 2
+    notifBorder.BorderColor3 = cor or Color3.fromRGB(150, 50, 255)
+    notifBorder.Parent = notif
+
+    local notifText = Instance.new("TextLabel")
+    notifText.Size = UDim2.new(1, -20, 1, 0)
+    notifText.Position = UDim2.new(0, 10, 0, 0)
+    notifText.BackgroundTransparency = 1
+    notifText.Text = texto
+    notifText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    notifText.TextScaled = true
+    notifText.Font = Enum.Font.Gotham
+    notifText.Parent = notif
+
+    table.insert(notificacoes, notif)
+    task.delay(3, function()
+        notif:Destroy()
+        for i, n in pairs(notificacoes) do
+            if n == notif then table.remove(notificacoes, i) break end
+        end
+    end)
+end
+
+-- ============================================
+-- LÓGICA PARA PLAYERS
+-- ============================================
+local ativo = false
+local alcance = 2.0
+local players = {}
+local mortos = {}
+local atacando = {}
+
+-- SCANEAR PLAYERS
+local function scanearPlayers()
+    players = {}
+    mortos = {}
+    atacando = {}
+    
+    local todosPlayers = Players:GetPlayers()
+    for _, p in pairs(todosPlayers) do
+        if p ~= player and p.Character then
+            local char = p.Character
+            local hum = char:FindFirstChild("Humanoid")
+            if hum and hum.Health and hum.Health > 0 then
+                table.insert(players, char)
+            end
+        end
+    end
+    
+    playerText.Text = "Players: " .. #players
+    logText.Text = "✅ Scan: " .. #players .. " players"
+    print("🎯 Players encontrados: " .. #players)
+end
+
+-- CRIAR HITBOX EM PLAYER
+local function criarHitboxPlayer(alvo)
+    if mortos[alvo] then return end
+    if not alvo or not alvo.Parent then return end
+    
+    local antiga = alvo:FindFirstChild("HitboxBorda")
+    if antiga then antiga:Destroy() end
+    
+    local root = alvo:FindFirstChild("HumanoidRootPart") or alvo:FindFirstChild("Head")
+    if not root then return end
+    
+    local hitbox = Instance.new("Part")
+    hitbox.Name = "HitboxBorda"
+    hitbox.Size = Vector3.new(6, 6, 6) * alcance
+    hitbox.Position = root.Position
+    hitbox.Anchored = true
+    hitbox.CanCollide = false
+    hitbox.Transparency = 0.35
+    hitbox.BrickColor = BrickColor.new("Bright red")
+    hitbox.Material = Enum.Material.Neon
+    hitbox.Parent = alvo
+    
+    local highlight = Instance.new("Highlight")
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineColor = Color3.fromRGB(255, 100, 255)
+    highlight.OutlineTransparency = 0.3
+    highlight.Parent = hitbox
+    
+    local danoContinuo = nil
+    
+    hitbox.Touched:Connect(function(other)
+        if not ativo then return end
+        if not other or not other:IsDescendantOf(character) then return end
+        if mortos[alvo] then return end
+        
+        local hum = alvo:FindFirstChild("Humanoid")
+        if not hum or hum.Health <= 0 then
+            mortos[alvo] = true
+            hitbox:Destroy()
+            return
+        end
+        
+        if atacando[alvo] then return end
+        atacando[alvo] = true
+        
+        danoContinuo = task.spawn(function()
+            while ativo and not mortos[alvo] and hum and hum.Health > 0 do
+                local dano = 8 * alcance
+                aplicarDano(alvo, dano)
+                
+                local nome = "Player"
+                for _, p in pairs(Players:GetPlayers()) do
+                    if p.Character == alvo then
+                        nome = p.Name
+                        break
+                    end
+                end
+                
+                logText.Text = "💥 " .. dano .. " (" .. nome .. ")"
+                
+                if hum.Health <= 0 then
+                    hum.Health = 0
+                    mortos[alvo] = true
+                    hitbox:Destroy()
+                    logText.Text = "💀 " .. nome .. " MORREU!"
+                    notificar("💀 " .. nome .. " morreu!", Color3.fromRGB(255, 50, 50))
+                    for i = #players, 1, -1 do
+                        if players[i] == alvo then table.remove(players, i) break end
+                    end
+                    playerText.Text = "Players: " .. #players
+                    break
+                end
+                task.wait(0.15)
+            end
+            atacando[alvo] = nil
+        end)
+    end)
+    
+    hitbox.TouchEnded:Connect(function(other)
+        if other and other:IsDescendantOf(character) then
+            if danoContinuo then
+                task.cancel(danoContinuo)
+                danoContinuo = nil
+            end
+            atacando[alvo] = nil
+        end
+    end)
+end
+
+-- LOOP DE ATUALIZAÇÃO
+RunService.Stepped:Connect(function()
+    if not ativo then return end
+    
+    for i = #players, 1, -1 do
+        local alvo = players[i]
+        if not alvo or not alvo.Parent then
+            table.remove(players, i)
+            continue
+        end
+        
+        local hum = alvo:FindFirstChild("Humanoid")
+        if not hum or hum.Health <= 0 then
+            mortos[alvo] = true
+            local h = alvo:FindFirstChild("HitboxBorda")
+            if h then h:Destroy() end
+            table.remove(players, i)
+            continue
+        end
+        
+        local hitbox = alvo:FindFirstChild("HitboxBorda")
+        if hitbox then
+            local root = alvo:FindFirstChild("HumanoidRootPart") or alvo:FindFirstChild("Head")
+            if root then
+                hitbox.Position = root.Position
+                hitbox.Size = Vector3.new(6, 6, 6) * alcance
+            end
+        elseif not mortos[alvo] then
+            criarHitboxPlayer(alvo)
+        end
+    end
+    
+    playerText.Text = "Players: " .. #players
+end)
+
+-- DETECTAR NOVOS PLAYERS
+Players.PlayerAdded:Connect(function(p)
+    task.wait(1)
+    if p ~= player and p.Character then
+        local char = p.Character
+        local hum = char:FindFirstChild("Humanoid")
+        if hum and hum.Health and hum.Health > 0 then
+            local existe = false
+            for _, a in pairs(players) do
+                if a == char then existe = true break end
+            end
+            if not existe then
+                table.insert(players, char)
+                if ativo then criarHitboxPlayer(char) end
+                playerText.Text = "Players: " .. #players
+                logText.Text = "🆕 " .. p.Name .. " entrou!"
+                notificar("🆕 " .. p.Name .. " entrou no jogo!", Color3.fromRGB(255, 200, 100))
+            end
+        end
+    end
+end)
+
+-- SLIDER
+local arrastando = false
+
+sliderThumb.MouseButton1Down:Connect(function()
+    arrastando = true
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        arrastando = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if arrastando and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local mouseX = input.Position.X
+        local pos = (mouseX - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X
+        pos = math.clamp(pos, 0, 1)
+        
+        sliderBar.Size = UDim2.new(pos, 0, 1, 0)
+        alcance = 1 + (pos * 8)
+        sliderLabel.Text = string.format("%.1fx", alcance)
+        
+        if ativo then
+            for _, alvo in pairs(players) do
+                local h = alvo:FindFirstChild("HitboxBorda")
+                if h then
+                    h.Size = Vector3.new(6, 6, 6) * alcance
+                end
+            end
+        end
+    end
+end)
+
+-- ============================================
+-- INICIAR
+-- ============================================
+task.wait(0.5)
+scanearPlayers()
+notificar("👥 Modo Player ativado!", Color3.fromRGB(150, 50, 255))
+
+print("========================================")
+print("👥 HITBOX PLAYER V10 - CARREGADO!")
+print("✅ Modo: PLAYERS (teste com amigos)")
+print("✅ Sistema de dano: " .. sistemaDano.tipo)
+print("✅ SCAN para encontrar players")
+print("✅ ATIVAR para criar hitboxes")
+print("========================================")
