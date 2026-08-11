@@ -1,13 +1,9 @@
--- LocalScript: Nicks + Proteção + Auto Collect (prioridade máxima em OG)
--- Só você vê
-
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- ====================== CONFIG ======================
 local DISTANCE = 30
 local OFFSET = Vector3.new(0, 3.8, 0)
 local TEXT_COLOR = Color3.fromRGB(255, 70, 70)
@@ -18,13 +14,12 @@ local enabled = true
 local autoCollect = false
 local tags = {}
 local lastCollect = 0
-local COLLECT_COOLDOWN = 0.85
+local lastScan = 0
+local SCAN_INTERVAL = 0.6
+local COLLECT_COOLDOWN = 0.9
 
--- ====================== FUNÇÕES DE TAG ======================
 local function createNameTag(player)
-	if player == LocalPlayer then return end
-	if not enabled then return end
-
+	if player == LocalPlayer or not enabled then return end
 	local character = player.Character
 	if not character then return end
 	local head = character:FindFirstChild("Head")
@@ -92,13 +87,13 @@ local function refreshAllTags()
 	end
 end
 
--- ====================== TELEPORTE ======================
 local function teleportTo(part)
 	local myChar = LocalPlayer.Character
 	if not myChar then return end
 	local myRoot = myChar:FindFirstChild("HumanoidRootPart")
-	if not myRoot or not part then return end
-	myRoot.CFrame = part.CFrame * CFrame.new(0, 3, 0)
+	if myRoot and part then
+		myRoot.CFrame = part.CFrame * CFrame.new(0, 3, 0)
+	end
 end
 
 local function teleportToNearestPlayer()
@@ -123,33 +118,25 @@ local function teleportToNearestPlayer()
 
 	if closest then
 		myRoot.CFrame = closest.CFrame * CFrame.new(0, 0, 3)
-		print("[Proteção] TP no player mais próximo")
 	end
 end
 
--- ====================== LER VALOR ======================
 local function parseMoney(text)
 	if not text then return 0 end
 	text = text:gsub("%$", ""):gsub(",", ""):gsub("%s+", ""):upper()
-
 	local number = tonumber(text:match("[%d%.]+"))
 	if not number then return 0 end
-
-	if text:find("K") then
-		number = number * 1000
-	elseif text:find("M") then
-		number = number * 1000000
-	elseif text:find("B") then
-		number = number * 1000000000
-	end
-
+	if text:find("K") then number = number * 1000
+	elseif text:find("M") then number = number * 1000000
+	elseif text:find("B") then number = number * 1000000000 end
 	return number
 end
 
--- ====================== AUTO COLLECT (PRIORIDADE OG) ======================
 local function tryCollectBest()
 	if not autoCollect then return end
 	if tick() - lastCollect < COLLECT_COOLDOWN then return end
+	if tick() - lastScan < SCAN_INTERVAL then return end
+	lastScan = tick()
 
 	local myChar = LocalPlayer.Character
 	if not myChar then return end
@@ -160,7 +147,6 @@ local function tryCollectBest()
 	local bestPart = nil
 	local bestText = ""
 
-	-- Players reais pra ignorar
 	local realPlayers = {}
 	for _, plr in ipairs(Players:GetPlayers()) do
 		if plr.Character then
@@ -173,11 +159,10 @@ local function tryCollectBest()
 			local text = obj.Text or ""
 			local upperText = text:upper()
 			local value = parseMoney(text)
-
-			-- Score: OG vale absurdamente mais
 			local score = value
+
 			if upperText:find("OG") then
-				score = score + 999999999 -- prioridade máxima
+				score = score + 999999999
 			end
 
 			if score > bestScore then
@@ -185,7 +170,7 @@ local function tryCollectBest()
 				local targetPart = nil
 				local isPlayer = false
 
-				for i = 1, 8 do
+				for i = 1, 6 do
 					if not current then break end
 					if realPlayers[current] then
 						isPlayer = true
@@ -193,8 +178,7 @@ local function tryCollectBest()
 					end
 					if current:IsA("BasePart") then
 						targetPart = current
-					end
-					if current:IsA("Model") then
+					elseif current:IsA("Model") then
 						targetPart = current.PrimaryPart or current:FindFirstChildWhichIsA("BasePart")
 					end
 					current = current.Parent
@@ -202,7 +186,7 @@ local function tryCollectBest()
 
 				if not isPlayer and targetPart then
 					local dist = (myRoot.Position - targetPart.Position).Magnitude
-					if dist < 450 then
+					if dist < 400 then
 						bestScore = score
 						bestPart = targetPart
 						bestText = text
@@ -223,7 +207,7 @@ local function tryCollectBest()
 			if prompt then
 				pcall(function()
 					prompt:InputHoldBegin()
-					task.wait(0.12)
+					task.wait(0.1)
 					prompt:InputHoldEnd()
 				end)
 			end
@@ -237,22 +221,18 @@ RunService.Heartbeat:Connect(function()
 	end
 end)
 
--- ====================== SETUP PLAYERS ======================
 local function setupPlayer(player)
 	player.CharacterAdded:Connect(function(character)
 		character:WaitForChild("Head", 5)
-		task.wait(0.4)
+		task.wait(0.35)
 		if enabled then createNameTag(player) end
 
 		task.spawn(function()
-			task.wait(0.55)
+			task.wait(0.5)
 			local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 			local theirRoot = character:FindFirstChild("HumanoidRootPart")
-			if myRoot and theirRoot then
-				if (myRoot.Position - theirRoot.Position).Magnitude <= AUTO_TP_DISTANCE then
-					print("[Proteção] Morph perto →", player.Name)
-					teleportToNearestPlayer()
-				end
+			if myRoot and theirRoot and (myRoot.Position - theirRoot.Position).Magnitude <= AUTO_TP_DISTANCE then
+				teleportToNearestPlayer()
 			end
 		end)
 	end)
@@ -260,7 +240,7 @@ local function setupPlayer(player)
 	if player.Character then
 		task.spawn(function()
 			player.Character:WaitForChild("Head", 5)
-			task.wait(0.4)
+			task.wait(0.35)
 			if enabled then createNameTag(player) end
 		end)
 	end
@@ -270,15 +250,11 @@ for _, player in ipairs(Players:GetPlayers()) do
 	setupPlayer(player)
 end
 Players.PlayerAdded:Connect(setupPlayer)
-Players.PlayerRemoving:Connect(function(player)
-	removeNameTag(player)
-end)
+Players.PlayerRemoving:Connect(removeNameTag)
 
--- ====================== GUI ======================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RealNameGUI"
 screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = PlayerGui
 
 local function createButton(name, text, posY, color)
@@ -292,7 +268,6 @@ local function createButton(name, text, posY, color)
 	btn.TextSize = 14
 	btn.Text = text
 	btn.Parent = screenGui
-
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 8)
 	corner.Parent = btn
@@ -316,14 +291,12 @@ autoButton.MouseButton1Click:Connect(function()
 	autoCollect = not autoCollect
 	autoButton.Text = autoCollect and "Auto Collect: ON" or "Auto Collect: OFF"
 	autoButton.BackgroundColor3 = autoCollect and Color3.fromRGB(20, 90, 30) or Color3.fromRGB(60, 20, 20)
-	print("[Auto Collect]", autoCollect and "Ligado (prioridade OG)" or "Desligado")
 end)
 
 UserInputService.InputBegan:Connect(function(input, gp)
-	if gp then return end
-	if input.KeyCode == Enum.KeyCode.E then
+	if not gp and input.KeyCode == Enum.KeyCode.E then
 		teleportToNearestPlayer()
 	end
 end)
 
-print("[Sistema] Nicks + Proteção + Auto Collect (OG prioritário) carregado")
+print("[Sistema Leve] Carregado")
