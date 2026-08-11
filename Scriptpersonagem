@@ -1,0 +1,329 @@
+-- LocalScript: Nicks + Proteção + Auto Collect (prioridade máxima em OG)
+-- Só você vê
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- ====================== CONFIG ======================
+local DISTANCE = 30
+local OFFSET = Vector3.new(0, 3.8, 0)
+local TEXT_COLOR = Color3.fromRGB(255, 70, 70)
+local BACKGROUND_COLOR = Color3.fromRGB(15, 15, 15)
+local AUTO_TP_DISTANCE = 25
+
+local enabled = true
+local autoCollect = false
+local tags = {}
+local lastCollect = 0
+local COLLECT_COOLDOWN = 0.85
+
+-- ====================== FUNÇÕES DE TAG ======================
+local function createNameTag(player)
+	if player == LocalPlayer then return end
+	if not enabled then return end
+
+	local character = player.Character
+	if not character then return end
+	local head = character:FindFirstChild("Head")
+	if not head then return end
+
+	if tags[player] then
+		tags[player]:Destroy()
+		tags[player] = nil
+	end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "RealNameTag"
+	billboard.Adornee = head
+	billboard.Size = UDim2.new(0, 200, 0, 45)
+	billboard.StudsOffset = OFFSET
+	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = DISTANCE
+	billboard.Parent = head
+
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(1, 0, 1, 0)
+	frame.BackgroundColor3 = BACKGROUND_COLOR
+	frame.BackgroundTransparency = 0.25
+	frame.BorderSizePixel = 0
+	frame.Parent = billboard
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = frame
+
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Size = UDim2.new(1, -6, 1, -4)
+	textLabel.Position = UDim2.new(0, 3, 0, 2)
+	textLabel.BackgroundTransparency = 1
+	textLabel.Text = player.Name
+	textLabel.TextColor3 = TEXT_COLOR
+	textLabel.TextScaled = true
+	textLabel.Font = Enum.Font.GothamBold
+	textLabel.Parent = frame
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 1.4
+	stroke.Color = Color3.fromRGB(0, 0, 0)
+	stroke.Parent = textLabel
+
+	tags[player] = billboard
+end
+
+local function removeNameTag(player)
+	if tags[player] then
+		tags[player]:Destroy()
+		tags[player] = nil
+	end
+end
+
+local function refreshAllTags()
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player \~= LocalPlayer then
+			if enabled then
+				createNameTag(player)
+			else
+				removeNameTag(player)
+			end
+		end
+	end
+end
+
+-- ====================== TELEPORTE ======================
+local function teleportTo(part)
+	local myChar = LocalPlayer.Character
+	if not myChar then return end
+	local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+	if not myRoot or not part then return end
+	myRoot.CFrame = part.CFrame * CFrame.new(0, 3, 0)
+end
+
+local function teleportToNearestPlayer()
+	local myChar = LocalPlayer.Character
+	if not myChar then return end
+	local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+	if not myRoot then return end
+
+	local closest, closestDist = nil, math.huge
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player \~= LocalPlayer and player.Character then
+			local root = player.Character:FindFirstChild("HumanoidRootPart")
+			if root then
+				local dist = (myRoot.Position - root.Position).Magnitude
+				if dist < closestDist then
+					closestDist = dist
+					closest = root
+				end
+			end
+		end
+	end
+
+	if closest then
+		myRoot.CFrame = closest.CFrame * CFrame.new(0, 0, 3)
+		print("[Proteção] TP no player mais próximo")
+	end
+end
+
+-- ====================== LER VALOR ======================
+local function parseMoney(text)
+	if not text then return 0 end
+	text = text:gsub("%$", ""):gsub(",", ""):gsub("%s+", ""):upper()
+
+	local number = tonumber(text:match("[%d%.]+"))
+	if not number then return 0 end
+
+	if text:find("K") then
+		number = number * 1000
+	elseif text:find("M") then
+		number = number * 1000000
+	elseif text:find("B") then
+		number = number * 1000000000
+	end
+
+	return number
+end
+
+-- ====================== AUTO COLLECT (PRIORIDADE OG) ======================
+local function tryCollectBest()
+	if not autoCollect then return end
+	if tick() - lastCollect < COLLECT_COOLDOWN then return end
+
+	local myChar = LocalPlayer.Character
+	if not myChar then return end
+	local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+	if not myRoot then return end
+
+	local bestScore = -1
+	local bestPart = nil
+	local bestText = ""
+
+	-- Players reais pra ignorar
+	local realPlayers = {}
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr.Character then
+			realPlayers[plr.Character] = true
+		end
+	end
+
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+			local text = obj.Text or ""
+			local upperText = text:upper()
+			local value = parseMoney(text)
+
+			-- Score: OG vale absurdamente mais
+			local score = value
+			if upperText:find("OG") then
+				score = score + 999999999 -- prioridade máxima
+			end
+
+			if score > bestScore then
+				local current = obj
+				local targetPart = nil
+				local isPlayer = false
+
+				for i = 1, 8 do
+					if not current then break end
+					if realPlayers[current] then
+						isPlayer = true
+						break
+					end
+					if current:IsA("BasePart") then
+						targetPart = current
+					end
+					if current:IsA("Model") then
+						targetPart = current.PrimaryPart or current:FindFirstChildWhichIsA("BasePart")
+					end
+					current = current.Parent
+				end
+
+				if not isPlayer and targetPart then
+					local dist = (myRoot.Position - targetPart.Position).Magnitude
+					if dist < 450 then
+						bestScore = score
+						bestPart = targetPart
+						bestText = text
+					end
+				end
+			end
+		end
+	end
+
+	if bestPart and bestScore > 0 then
+		print("[Auto Collect] Alvo:", bestText)
+		teleportTo(bestPart)
+		lastCollect = tick()
+
+		local model = bestPart:FindFirstAncestorOfClass("Model")
+		if model then
+			local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
+			if prompt then
+				pcall(function()
+					prompt:InputHoldBegin()
+					task.wait(0.12)
+					prompt:InputHoldEnd()
+				end)
+			end
+		end
+	end
+end
+
+RunService.Heartbeat:Connect(function()
+	if autoCollect then
+		tryCollectBest()
+	end
+end)
+
+-- ====================== SETUP PLAYERS ======================
+local function setupPlayer(player)
+	player.CharacterAdded:Connect(function(character)
+		character:WaitForChild("Head", 5)
+		task.wait(0.4)
+		if enabled then createNameTag(player) end
+
+		task.spawn(function()
+			task.wait(0.55)
+			local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+			local theirRoot = character:FindFirstChild("HumanoidRootPart")
+			if myRoot and theirRoot then
+				if (myRoot.Position - theirRoot.Position).Magnitude <= AUTO_TP_DISTANCE then
+					print("[Proteção] Morph perto →", player.Name)
+					teleportToNearestPlayer()
+				end
+			end
+		end)
+	end)
+
+	if player.Character then
+		task.spawn(function()
+			player.Character:WaitForChild("Head", 5)
+			task.wait(0.4)
+			if enabled then createNameTag(player) end
+		end)
+	end
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+	setupPlayer(player)
+end
+Players.PlayerAdded:Connect(setupPlayer)
+Players.PlayerRemoving:Connect(function(player)
+	removeNameTag(player)
+end)
+
+-- ====================== GUI ======================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "RealNameGUI"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = PlayerGui
+
+local function createButton(name, text, posY, color)
+	local btn = Instance.new("TextButton")
+	btn.Name = name
+	btn.Size = UDim2.new(0, 150, 0, 36)
+	btn.Position = UDim2.new(1, -170, 0, posY)
+	btn.BackgroundColor3 = color
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 14
+	btn.Text = text
+	btn.Parent = screenGui
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = btn
+	return btn
+end
+
+local toggleButton = createButton("ToggleButton", "Nicks: ON", 15, Color3.fromRGB(30, 30, 30))
+local tpButton = createButton("TPButton", "TP Nearest", 58, Color3.fromRGB(20, 60, 100))
+local autoButton = createButton("AutoButton", "Auto Collect: OFF", 101, Color3.fromRGB(60, 20, 20))
+
+toggleButton.MouseButton1Click:Connect(function()
+	enabled = not enabled
+	toggleButton.Text = enabled and "Nicks: ON" or "Nicks: OFF"
+	toggleButton.BackgroundColor3 = enabled and Color3.fromRGB(30, 30, 30) or Color3.fromRGB(80, 20, 20)
+	refreshAllTags()
+end)
+
+tpButton.MouseButton1Click:Connect(teleportToNearestPlayer)
+
+autoButton.MouseButton1Click:Connect(function()
+	autoCollect = not autoCollect
+	autoButton.Text = autoCollect and "Auto Collect: ON" or "Auto Collect: OFF"
+	autoButton.BackgroundColor3 = autoCollect and Color3.fromRGB(20, 90, 30) or Color3.fromRGB(60, 20, 20)
+	print("[Auto Collect]", autoCollect and "Ligado (prioridade OG)" or "Desligado")
+end)
+
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if input.KeyCode == Enum.KeyCode.E then
+		teleportToNearestPlayer()
+	end
+end)
+
+print("[Sistema] Nicks + Proteção + Auto Collect (OG prioritário) carregado")
