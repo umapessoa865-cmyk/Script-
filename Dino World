@@ -1,0 +1,324 @@
+--[[
+    Dino World Hub - Completo
+    Place ID: 88437492288640
+    Features:
+    - ESP Dinossauros / Fósseis / Madeira
+    - Auto Cortar Madeira (detecta ferramenta)
+    - Seleção de árvores
+    - Distância configurável
+    - Auto Collect
+]]
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local Character, Humanoid, Root
+
+local function updateChar()
+    Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    Humanoid = Character:WaitForChild("Humanoid")
+    Root = Character:WaitForChild("HumanoidRootPart")
+end
+updateChar()
+LocalPlayer.CharacterAdded:Connect(updateChar)
+
+-- Limpa GUI antiga
+pcall(function()
+    if CoreGui:FindFirstChild("DinoWorldHub") then
+        CoreGui.DinoWorldHub:Destroy()
+    end
+end)
+
+-- ==================== CONFIGURAÇÕES ====================
+local Config = {
+    ESP = {
+        Dinosaurs = false,
+        Fossils = false,
+        Wood = false,
+        MaxDistance = 450
+    },
+    AutoWood = {
+        Enabled = false,
+        Distance = 300,
+        Trees = {
+            ["Cherry Blossom Tree"] = true,
+            ["Dino Tree"] = true,
+            ["Pear Tree"] = true,
+            ["Plap Tree"] = true,
+            ["Small Tree"] = true,
+            ["Volcanic Tree"] = true
+        }
+    },
+    AutoCollect = false,
+    Speed = 28,
+    Jump = 50,
+    SpeedEnabled = false,
+    JumpEnabled = false
+}
+
+-- ==================== LISTAS ====================
+local dinoKeywords = {"saur", "rex", "raptor", "spino", "giga", "tricer", "stego", "ankylo", "pachy", "agrios", "goat"}
+local fossilNames = {["Bone"] = true, ["Dino Bone"] = true}
+local woodNames = {["Wood"] = true, ["Rotten Wood"] = true, ["Log of Vines"] = true, ["Worm Log"] = true, ["Wood Worm"] = true}
+
+-- ==================== GUI ====================
+local sg = Instance.new("ScreenGui")
+sg.Name = "DinoWorldHub"
+sg.ResetOnSpawn = false
+sg.Parent = CoreGui
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 260, 0, 420)
+main.Position = UDim2.new(0.02, 0, 0.2, 0)
+main.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+main.Active = true
+main.Draggable = true
+main.Parent = sg
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 34)
+title.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+title.Text = "Dino World Hub"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 15
+title.Parent = main
+Instance.new("UICorner", title).CornerRadius = UDim.new(0, 10)
+
+local function createToggle(text, y, default, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 28)
+    btn.Position = UDim2.new(0.05, 0, 0, y)
+    btn.BackgroundColor3 = default and Color3.fromRGB(0, 145, 65) or Color3.fromRGB(45, 45, 55)
+    btn.Text = text .. (default and " : ON" or " : OFF")
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 12
+    btn.Parent = main
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+
+    local state = default
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.BackgroundColor3 = state and Color3.fromRGB(0, 145, 65) or Color3.fromRGB(45, 45, 55)
+        btn.Text = text .. (state and " : ON" or " : OFF")
+        callback(state)
+    end)
+    return btn
+end
+
+-- ESP
+createToggle("ESP Dinossauros", 45, false, function(v) Config.ESP.Dinosaurs = v end)
+createToggle("ESP Fósseis", 78, false, function(v) Config.ESP.Fossils = v end)
+createToggle("ESP Madeira", 111, false, function(v) Config.ESP.Wood = v end)
+
+-- Auto Wood
+createToggle("Auto Cortar Madeira", 154, false, function(v) Config.AutoWood.Enabled = v end)
+createToggle("Auto Collect", 187, false, function(v) Config.AutoCollect = v end)
+
+-- Speed / Jump
+createToggle("Speed 28", 230, false, function(v) Config.SpeedEnabled = v end)
+createToggle("Jump 50", 263, false, function(v) Config.JumpEnabled = v end)
+
+-- Status
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0.9, 0, 0, 20)
+statusLabel.Position = UDim2.new(0.05, 0, 0, 300)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Ferramenta: Nenhuma"
+statusLabel.TextColor3 = Color3.fromRGB(160, 210, 255)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 11
+statusLabel.Parent = main
+
+local infoLabel = Instance.new("TextLabel")
+infoLabel.Size = UDim2.new(0.9, 0, 0, 40)
+infoLabel.Position = UDim2.new(0.05, 0, 0, 325)
+infoLabel.BackgroundTransparency = 1
+infoLabel.Text = "Equipe a ferramenta de cortar\nmadeira antes de ligar o Auto"
+infoLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+infoLabel.Font = Enum.Font.Gotham
+infoLabel.TextSize = 11
+infoLabel.TextWrapped = true
+infoLabel.Parent = main
+
+local collectBtn = Instance.new("TextButton")
+collectBtn.Size = UDim2.new(0.9, 0, 0, 30)
+collectBtn.Position = UDim2.new(0.05, 0, 0, 375)
+collectBtn.BackgroundColor3 = Color3.fromRGB(40, 90, 160)
+collectBtn.Text = "COLETAR AGORA"
+collectBtn.TextColor3 = Color3.new(1,1,1)
+collectBtn.Font = Enum.Font.GothamBold
+collectBtn.TextSize = 12
+collectBtn.Parent = main
+Instance.new("UICorner", collectBtn).CornerRadius = UDim.new(0, 5)
+
+-- ==================== FUNÇÕES ====================
+local remote = ReplicatedStorage:WaitForChild("ByteNetReliable")
+local espFolder = Instance.new("Folder", Workspace)
+espFolder.Name = "DinoESP_Folder"
+
+local function clearESP()
+    for _, v in pairs(espFolder:GetChildren()) do
+        v:Destroy()
+    end
+end
+
+local function createESP(part, text, color)
+    local bb = Instance.new("BillboardGui")
+    bb.Adornee = part
+    bb.Size = UDim2.new(0, 120, 0, 28)
+    bb.StudsOffset = Vector3.new(0, 2.6, 0)
+    bb.AlwaysOnTop = true
+    bb.Parent = espFolder
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = color
+    label.TextStrokeTransparency = 0.45
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 11
+    label.Parent = bb
+end
+
+local function isDino(name)
+    local lower = string.lower(name)
+    for _, key in ipairs(dinoKeywords) do
+        if string.find(lower, key) then return true end
+    end
+    return false
+end
+
+local function getEquippedTool()
+    if not Character then return nil end
+    for _, item in pairs(Character:GetChildren()) do
+        if item:IsA("Tool") then
+            return item.Name
+        end
+    end
+    return nil
+end
+
+local function fireTool(toolName, activated, pos)
+    if not toolName then return end
+    local args = {
+        buffer.fromstring("\001\001"),
+        {{"Tool", "Activated", toolName, activated, vector.create(pos.X, pos.Y, pos.Z)}}
+    }
+    pcall(function()
+        remote:FireServer(unpack(args))
+    end)
+end
+
+local function getClosestTree()
+    if not Root then return nil end
+    local closest, shortest = nil, Config.AutoWood.Distance
+
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and Config.AutoWood.Trees[obj.Name] then
+            local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+            if part then
+                local dist = (Root.Position - part.Position).Magnitude
+                if dist < shortest then
+                    shortest = dist
+                    closest = part
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local function collectNearby()
+    if not Root then return end
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if woodNames[obj.Name] or fossilNames[obj.Name] then
+            local part = obj:IsA("BasePart") and obj or (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart"))
+            if part and (Root.Position - part.Position).Magnitude < 22 then
+                local prompt = part:FindFirstChildOfClass("ProximityPrompt") or obj:FindFirstChildOfClass("ProximityPrompt")
+                if prompt then
+                    pcall(fireproximityprompt, prompt)
+                end
+            end
+        end
+    end
+end
+
+-- ==================== LOOPS ====================
+-- ESP
+task.spawn(function()
+    while true do
+        task.wait(1.3)
+        clearESP()
+        if not Root then continue end
+
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            local name = obj.Name
+            local part = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChildWhichIsA("BasePart")) or (obj:IsA("BasePart") and obj)
+
+            if not part then continue end
+            local dist = (Root.Position - part.Position).Magnitude
+            if dist > Config.ESP.MaxDistance then continue end
+
+            if Config.ESP.Dinosaurs and isDino(name) and obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
+                createESP(part, name .. " [" .. math.floor(dist) .. "m]", Color3.fromRGB(255, 70, 70))
+            end
+
+            if Config.ESP.Fossils and fossilNames[name] then
+                createESP(part, "Fóssil [" .. math.floor(dist) .. "m]", Color3.fromRGB(255, 200, 50))
+            end
+
+            if Config.ESP.Wood and woodNames[name] then
+                createESP(part, "Madeira", Color3.fromRGB(60, 220, 80))
+            end
+        end
+    end
+end)
+
+-- Auto Wood + Collect
+task.spawn(function()
+    while true do
+        task.wait(0.35)
+        if not Root then continue end
+
+        local tool = getEquippedTool()
+        statusLabel.Text = "Ferramenta: " .. (tool or "Nenhuma")
+
+        if Config.AutoWood.Enabled and tool then
+            local tree = getClosestTree()
+            if tree then
+                local pos = tree.Position
+                fireTool(tool, true, pos)
+                task.wait(0.1)
+                fireTool(tool, false, pos)
+            end
+        end
+
+        if Config.AutoCollect then
+            collectNearby()
+        end
+    end
+end)
+
+-- Speed / Jump
+RunService.Heartbeat:Connect(function()
+    if not Humanoid then return end
+    if Config.SpeedEnabled then
+        Humanoid.WalkSpeed = Config.Speed
+    end
+    if Config.JumpEnabled then
+        Humanoid.UseJumpPower = true
+        Humanoid.JumpPower = Config.Jump
+    end
+end)
+
+collectBtn.MouseButton1Click:Connect(collectNearby)
+
+print("✅ Dino World Hub completo carregado!")
