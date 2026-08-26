@@ -1,6 +1,6 @@
 --[[
     MorphUp! Hub - Rayfield
-    Coloque no GitHub e use loadstring
+    Versão corrigida
 ]]
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -19,7 +19,6 @@ local Window = Rayfield:CreateWindow({
     KeySystem = false
 })
 
--- Serviços
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -39,7 +38,6 @@ LocalPlayer.CharacterAdded:Connect(function()
     pcall(refreshChar)
 end)
 
--- Remote
 local AttackRemote = nil
 pcall(function()
     AttackRemote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("AttackRequest")
@@ -53,7 +51,6 @@ local function Attack(tipo)
     end
 end
 
--- Config
 local Config = {
     KillAura = false,
     KillAuraDist = 45,
@@ -64,7 +61,6 @@ local Config = {
     SpeedValue = 22
 }
 
--- ==================== ABA COMBATE ====================
 local CombatTab = Window:CreateTab("Combate", 4483362458)
 
 CombatTab:CreateToggle({
@@ -97,7 +93,6 @@ CombatTab:CreateSlider({
     end
 })
 
--- ==================== ABA VISUAL ====================
 local VisualTab = Window:CreateTab("Visual", 4483362458)
 
 VisualTab:CreateToggle({
@@ -109,7 +104,6 @@ VisualTab:CreateToggle({
     end
 })
 
--- ==================== ABA MOVIMENTO ====================
 local MoveTab = Window:CreateTab("Movimento", 4483362458)
 
 MoveTab:CreateToggle({
@@ -142,7 +136,6 @@ MoveTab:CreateSlider({
     end
 })
 
--- ==================== ESP ====================
 local ESPFolder = Instance.new("Folder")
 ESPFolder.Name = "MorphESP"
 ESPFolder.Parent = Workspace
@@ -172,7 +165,6 @@ local function createESP(player, part, dist)
     label.Parent = bb
 end
 
--- ==================== LOOPS ====================
 local lastAttack = 0
 
 task.spawn(function()
@@ -200,7 +192,6 @@ task.spawn(function()
     while true do
         task.wait(0.2)
         pcall(function()
-            -- Kill Aura
             if Config.KillAura and Root and tick() - lastAttack > 0.40 then
                 local closest, closestDist = nil, Config.KillAuraDist
                 for _, plr in pairs(Players:GetPlayers()) do
@@ -228,7 +219,6 @@ task.spawn(function()
                 end
             end
 
-            -- Noclip
             if Config.Noclip and Character then
                 for _, part in pairs(Character:GetDescendants()) do
                     if part:IsA("BasePart") then
