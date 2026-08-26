@@ -1,0 +1,273 @@
+--[[
+    MorphUp! Hub - Rayfield v1.8
+    Interface criada primeiro (mais estável)
+]]
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "MorphUp! Hub",
+    LoadingTitle = "MorphUp! Hub",
+    LoadingSubtitle = "by Grok",
+    Theme = "Default",
+    ConfigurationSaving = {
+        Enabled = false
+    },
+    KeySystem = false
+})
+
+-- ==================== ABAS PRIMEIRO ====================
+local CombatTab = Window:CreateTab("Combate", 4483362458)
+local VisualTab = Window:CreateTab("Visual", 4483362458)
+local MoveTab = Window:CreateTab("Movimento", 4483362458)
+
+local Config = {
+    KillAura = false,
+    KillAuraDist = 45,
+    UseSpecial = false,
+    ESP = true,
+    Noclip = false,
+    Speed = false,
+    SpeedValue = 22
+}
+
+CombatTab:CreateToggle({
+    Name = "Kill Aura",
+    CurrentValue = false,
+    Flag = "KillAura",
+    Callback = function(Value)
+        Config.KillAura = Value
+    end
+})
+
+CombatTab:CreateToggle({
+    Name = "Usar Special",
+    CurrentValue = false,
+    Flag = "UseSpecial",
+    Callback = function(Value)
+        Config.UseSpecial = Value
+    end
+})
+
+CombatTab:CreateSlider({
+    Name = "Distância Aura",
+    Range = {15, 90},
+    Increment = 5,
+    CurrentValue = 45,
+    Flag = "AuraDist",
+    Callback = function(Value)
+        Config.KillAuraDist = Value
+    end
+})
+
+VisualTab:CreateToggle({
+    Name = "ESP Jogadores",
+    CurrentValue = true,
+    Flag = "ESP",
+    Callback = function(Value)
+        Config.ESP = Value
+    end
+})
+
+MoveTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Flag = "Noclip",
+    Callback = function(Value)
+        Config.Noclip = Value
+    end
+})
+
+MoveTab:CreateToggle({
+    Name = "Speed",
+    CurrentValue = false,
+    Flag = "Speed",
+    Callback = function(Value)
+        Config.Speed = Value
+    end
+})
+
+MoveTab:CreateSlider({
+    Name = "Valor Speed",
+    Range = {16, 35},
+    Increment = 1,
+    CurrentValue = 22,
+    Flag = "SpeedVal",
+    Callback = function(Value)
+        Config.SpeedValue = Value
+    end
+})
+
+Rayfield:Notify({
+    Title = "MorphUp! Hub",
+    Content = "Interface carregada!",
+    Duration = 4
+})
+
+-- ==================== LÓGICA DEPOIS ====================
+task.spawn(function()
+    local Players = game:GetService("Players")
+    local Workspace = game:GetService("Workspace")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local RunService = game:GetService("RunService")
+
+    local LocalPlayer = Players.LocalPlayer
+    local Character, Humanoid, Root
+
+    local function refreshChar()
+        Character = LocalPlayer.Character
+        if Character then
+            Humanoid = Character:FindFirstChildOfClass("Humanoid")
+            Root = Character:FindFirstChild("HumanoidRootPart")
+        end
+    end
+    refreshChar()
+    LocalPlayer.CharacterAdded:Connect(function()
+        task.wait(1)
+        refreshChar()
+    end)
+
+    local AttackRemote = nil
+    pcall(function()
+        AttackRemote = ReplicatedStorage.Events.AttackRequest
+    end)
+
+    local function Attack(tipo)
+        if AttackRemote then
+            pcall(function()
+                AttackRemote:FireServer(tipo)
+            end)
+        end
+    end
+
+    local ESPFolder = Instance.new("Folder")
+    ESPFolder.Name = "MorphESP"
+    ESPFolder.Parent = Workspace
+
+    local function clearESP()
+        for _, v in pairs(ESPFolder:GetChildren()) do
+            v:Destroy()
+        end
+    end
+
+    local function createESP(player, part, dist)
+        local bb = Instance.new("BillboardGui")
+        bb.Adornee = part
+        bb.Size = UDim2.new(0, 120, 0, 28)
+        bb.StudsOffset = Vector3.new(0, 3.2, 0)
+        bb.AlwaysOnTop = true
+        bb.Parent = ESPFolder
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = player.Name .. " [" .. math.floor(dist) .. "m]"
+        label.TextColor3 = Color3.fromRGB(255, 70, 70)
+        label.TextStrokeTransparency = 0.4
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 12
+        label.Parent = bb
+    end
+
+    local lastAttack = 0
+
+    while true do
+        task.wait(0.25)
+
+        pcall(function()
+            -- Kill Aura
+            if Config.KillAura and Root and tick() - lastAttack > 0.40 then
+                local closest, closestDist = nil, Config.KillAuraDist
+                for _, plr in pairs(Players:GetPlayers()) do
+                    if not (plr == LocalPlayer) and plr.Character then
+                        local tRoot = plr.Character:FindFirstChild("HumanoidRootPart")
+                        local tHum = plr.Character:FindFirstChildOfClass("Humanoid")
+                        if tRoot and tHum and tHum.Health > 0 then
+                            local d = (Root.Position - tRoot.Position).Magnitude
+                            if d < closestDist then
+                                closestDist = d
+                                closest = tRoot
+                            end
+                        end
+                    end
+                end
+                if closest then
+                    Root.CFrame = CFrame.lookAt(Root.Position, closest.Position)
+                    task.wait(0.03)
+                    Attack("Primary")
+                    if Config.UseSpecial then
+                        task.wait(0.1)
+                        Attack("Special")
+                    end
+                    lastAttack = tick()
+                end
+            end
+
+            -- Noclip
+            if Config.Noclip and Character then
+                for _, part in pairs(Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+
+            -- Speed
+            if Config.Speed and Humanoid then
+                Humanoid.WalkSpeed = Config.SpeedValue
+            end
+        end)
+    end
+end)
+
+-- ESP separado (mais leve)
+task.spawn(function()
+    local Players = game:GetService("Players")
+    local Workspace = game:GetService("Workspace")
+    local LocalPlayer = Players.LocalPlayer
+
+    while true do
+        task.wait(1.5)
+        pcall(function()
+            local folder = Workspace:FindFirstChild("MorphESP")
+            if folder then
+                for _, v in pairs(folder:GetChildren()) do
+                    v:Destroy()
+                end
+            end
+
+            if not Config.ESP then return end
+            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if not root then return end
+
+            for _, plr in pairs(Players:GetPlayers()) do
+                if not (plr == LocalPlayer) and plr.Character then
+                    local part = plr.Character:FindFirstChild("HumanoidRootPart")
+                    if part then
+                        local dist = (root.Position - part.Position).Magnitude
+                        if dist < 400 then
+                            local bb = Instance.new("BillboardGui")
+                            bb.Adornee = part
+                            bb.Size = UDim2.new(0, 120, 0, 28)
+                            bb.StudsOffset = Vector3.new(0, 3.2, 0)
+                            bb.AlwaysOnTop = true
+                            bb.Parent = folder or Workspace
+
+                            local label = Instance.new("TextLabel")
+                            label.Size = UDim2.new(1, 0, 1, 0)
+                            label.BackgroundTransparency = 1
+                            label.Text = plr.Name .. " [" .. math.floor(dist) .. "m]"
+                            label.TextColor3 = Color3.fromRGB(255, 70, 70)
+                            label.TextStrokeTransparency = 0.4
+                            label.Font = Enum.Font.GothamBold
+                            label.TextSize = 12
+                            label.Parent = bb
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+print("MorphUp! Hub v1.8 carregado!")
