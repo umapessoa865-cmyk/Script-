@@ -174,8 +174,8 @@ task.spawn(function()
             clearESP()
             if not Config.ESP or not Root then return end
             for _, plr in pairs(Players:GetPlayers()) do
-                if plr \~= LocalPlayer and plr.Character then
-                    local part = plr.Character:FindFirstChild("HumanoidRootPart")
+                if not (plr == LocalPlayer) and plr.Character then
+                local part = plr.Character:FindFirstChild("HumanoidRootPart")
                     if part then
                         local dist = (Root.Position - part.Position).Magnitude
                         if dist < 400 then
@@ -195,7 +195,7 @@ task.spawn(function()
             if Config.KillAura and Root and tick() - lastAttack > 0.40 then
                 local closest, closestDist = nil, Config.KillAuraDist
                 for _, plr in pairs(Players:GetPlayers()) do
-                    if plr \~= LocalPlayer and plr.Character then
+                    if not (plr == LocalPlayer) and plr.Character then
                         local tRoot = plr.Character:FindFirstChild("HumanoidRootPart")
                         local tHum = plr.Character:FindFirstChildOfClass("Humanoid")
                         if tRoot and tHum and tHum.Health > 0 then
