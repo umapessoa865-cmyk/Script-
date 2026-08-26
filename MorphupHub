@@ -1,0 +1,255 @@
+--[[
+    MorphUp! Hub - Rayfield
+    Coloque no GitHub e use loadstring
+]]
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "MorphUp! Hub",
+    LoadingTitle = "MorphUp! Hub",
+    LoadingSubtitle = "by Grok",
+    Theme = "Default",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "MorphUpHub",
+        FileName = "Config"
+    },
+    Discord = { Enabled = false },
+    KeySystem = false
+})
+
+-- Serviços
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local Character, Humanoid, Root
+
+local function refreshChar()
+    Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    Humanoid = Character:WaitForChild("Humanoid", 3)
+    Root = Character:WaitForChild("HumanoidRootPart", 3)
+end
+pcall(refreshChar)
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1.2)
+    pcall(refreshChar)
+end)
+
+-- Remote
+local AttackRemote = nil
+pcall(function()
+    AttackRemote = ReplicatedStorage:WaitForChild("Events"):WaitForChild("AttackRequest")
+end)
+
+local function Attack(tipo)
+    if AttackRemote then
+        pcall(function()
+            AttackRemote:FireServer(tipo)
+        end)
+    end
+end
+
+-- Config
+local Config = {
+    KillAura = false,
+    KillAuraDist = 45,
+    UseSpecial = false,
+    ESP = true,
+    Noclip = false,
+    Speed = false,
+    SpeedValue = 22
+}
+
+-- ==================== ABA COMBATE ====================
+local CombatTab = Window:CreateTab("Combate", 4483362458)
+
+CombatTab:CreateToggle({
+    Name = "Kill Aura",
+    CurrentValue = false,
+    Flag = "KillAura",
+    Callback = function(Value)
+        Config.KillAura = Value
+    end
+})
+
+CombatTab:CreateToggle({
+    Name = "Usar Special também",
+    CurrentValue = false,
+    Flag = "UseSpecial",
+    Callback = function(Value)
+        Config.UseSpecial = Value
+    end
+})
+
+CombatTab:CreateSlider({
+    Name = "Distância Kill Aura",
+    Range = {15, 90},
+    Increment = 5,
+    Suffix = " studs",
+    CurrentValue = 45,
+    Flag = "AuraDist",
+    Callback = function(Value)
+        Config.KillAuraDist = Value
+    end
+})
+
+-- ==================== ABA VISUAL ====================
+local VisualTab = Window:CreateTab("Visual", 4483362458)
+
+VisualTab:CreateToggle({
+    Name = "ESP Jogadores",
+    CurrentValue = true,
+    Flag = "ESP",
+    Callback = function(Value)
+        Config.ESP = Value
+    end
+})
+
+-- ==================== ABA MOVIMENTO ====================
+local MoveTab = Window:CreateTab("Movimento", 4483362458)
+
+MoveTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Flag = "Noclip",
+    Callback = function(Value)
+        Config.Noclip = Value
+    end
+})
+
+MoveTab:CreateToggle({
+    Name = "Speed",
+    CurrentValue = false,
+    Flag = "Speed",
+    Callback = function(Value)
+        Config.Speed = Value
+    end
+})
+
+MoveTab:CreateSlider({
+    Name = "Valor Speed",
+    Range = {16, 35},
+    Increment = 1,
+    Suffix = "",
+    CurrentValue = 22,
+    Flag = "SpeedVal",
+    Callback = function(Value)
+        Config.SpeedValue = Value
+    end
+})
+
+-- ==================== ESP ====================
+local ESPFolder = Instance.new("Folder")
+ESPFolder.Name = "MorphESP"
+ESPFolder.Parent = Workspace
+
+local function clearESP()
+    for _, v in pairs(ESPFolder:GetChildren()) do
+        v:Destroy()
+    end
+end
+
+local function createESP(player, part, dist)
+    local bb = Instance.new("BillboardGui")
+    bb.Adornee = part
+    bb.Size = UDim2.new(0, 120, 0, 28)
+    bb.StudsOffset = Vector3.new(0, 3.2, 0)
+    bb.AlwaysOnTop = true
+    bb.Parent = ESPFolder
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = player.Name .. " [" .. math.floor(dist) .. "m]"
+    label.TextColor3 = Color3.fromRGB(255, 70, 70)
+    label.TextStrokeTransparency = 0.4
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 12
+    label.Parent = bb
+end
+
+-- ==================== LOOPS ====================
+local lastAttack = 0
+
+task.spawn(function()
+    while true do
+        task.wait(1.3)
+        pcall(function()
+            clearESP()
+            if not Config.ESP or not Root then return end
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr \~= LocalPlayer and plr.Character then
+                    local part = plr.Character:FindFirstChild("HumanoidRootPart")
+                    if part then
+                        local dist = (Root.Position - part.Position).Magnitude
+                        if dist < 400 then
+                            createESP(plr, part, dist)
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        pcall(function()
+            -- Kill Aura
+            if Config.KillAura and Root and tick() - lastAttack > 0.40 then
+                local closest, closestDist = nil, Config.KillAuraDist
+                for _, plr in pairs(Players:GetPlayers()) do
+                    if plr \~= LocalPlayer and plr.Character then
+                        local tRoot = plr.Character:FindFirstChild("HumanoidRootPart")
+                        local tHum = plr.Character:FindFirstChildOfClass("Humanoid")
+                        if tRoot and tHum and tHum.Health > 0 then
+                            local d = (Root.Position - tRoot.Position).Magnitude
+                            if d < closestDist then
+                                closestDist = d
+                                closest = tRoot
+                            end
+                        end
+                    end
+                end
+                if closest then
+                    Root.CFrame = CFrame.lookAt(Root.Position, closest.Position)
+                    task.wait(0.03)
+                    Attack("Primary")
+                    if Config.UseSpecial then
+                        task.wait(0.1)
+                        Attack("Special")
+                    end
+                    lastAttack = tick()
+                end
+            end
+
+            -- Noclip
+            if Config.Noclip and Character then
+                for _, part in pairs(Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if Config.Speed and Humanoid then
+        Humanoid.WalkSpeed = Config.SpeedValue
+    end
+end)
+
+Rayfield:Notify({
+    Title = "MorphUp! Hub",
+    Content = "Carregado com sucesso!",
+    Duration = 4
+})
+
+print("MorphUp! Hub (Rayfield) carregado!")
