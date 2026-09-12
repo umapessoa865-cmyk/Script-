@@ -1,0 +1,337 @@
+--[[
+    Rusty Rafts 2.0 - Rayfield
+    Aimbot + Marcar Vela + TP Players
+    Tudo OFF por padrao
+]]
+
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Rusty Rafts 2.0",
+    LoadingTitle = "Rusty Rafts",
+    LoadingSubtitle = "Aimbot + TP",
+    Theme = "Default",
+    ConfigurationSaving = { Enabled = false },
+    KeySystem = false
+})
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local Camera = Workspace.CurrentCamera
+
+local LocalPlayer = Players.LocalPlayer
+
+local Config = {
+    Aimbot = false,
+    AimbotDist = 200,
+    AimbotSmooth = 0.16,
+    WallCheck = true,
+
+    AutoTPBoat = false,
+    HealthPercent = 35,
+    BoatMinDist = 20,
+    BoatCooldown = 8,
+    lastBoatTP = 0
+}
+
+-- Vela marcada pelo jogador
+local MarkedSail = nil
+
+-- ==================== ABA AIMBOT ====================
+local AimTab = Window:CreateTab("Aimbot", 4483362458)
+
+AimTab:CreateToggle({
+    Name = "Aimbot (NPCs)",
+    CurrentValue = false,
+    Callback = function(v) Config.Aimbot = v end
+})
+
+AimTab:CreateToggle({
+    Name = "Wall Check (nao mirar atras de parede)",
+    CurrentValue = false,
+    Callback = function(v) Config.WallCheck = v end
+})
+
+AimTab:CreateSlider({
+    Name = "Distancia Aimbot",
+    Range = {50, 350},
+    Increment = 10,
+    CurrentValue = 200,
+    Callback = function(v) Config.AimbotDist = v end
+})
+
+AimTab:CreateSlider({
+    Name = "Suavidade",
+    Range = {0.05, 0.45},
+    Increment = 0.01,
+    CurrentValue = 0.16,
+    Callback = function(v) Config.AimbotSmooth = v end
+})
+
+local AimStatus = AimTab:CreateLabel("Alvo: nenhum")
+
+-- ==================== ABA VELA ====================
+local BoatTab = Window:CreateTab("TP Vela", 4483362458)
+
+BoatTab:CreateParagraph({
+    Title = "Como usar",
+    Content = "1) Sobe na SUA vela\n2) Aperta MARCAR ESTA VELA\n3) Depois use TP ou Auto TP"
+})
+
+local SailStatus = BoatTab:CreateLabel("Vela marcada: nenhuma")
+
+BoatTab:CreateButton({
+    Name = "MARCAR ESTA VELA",
+    Callback = function()
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not root then
+            Rayfield:Notify({ Title = "Erro", Content = "Sem personagem", Duration = 3 })
+            return
+        end
+
+        local best = nil
+        local bestDist = 20
+
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            local n = string.lower(obj.Name)
+            if n == "sail" or n == "sailmodel" or n == "mast"
+            or string.find(n, "sail") or string.find(n, "mast") then
+                local part = obj:IsA("BasePart") and obj
+                    or obj:FindFirstChildWhichIsA("BasePart")
+                    or obj.PrimaryPart
+                if part then
+                    local d = (root.Position - part.Position).Magnitude
+                    if d < bestDist then
+                        bestDist = d
+                        best = part
+                    end
+                end
+            end
+        end
+
+        if best then
+            MarkedSail = best
+            SailStatus:Set("Vela marcada: " .. best.Name .. " (" .. math.floor(bestDist) .. "m)")
+            Rayfield:Notify({ Title = "Vela", Content = "Vela marcada com sucesso!", Duration = 3 })
+        else
+            SailStatus:Set("Vela marcada: nenhuma")
+            Rayfield:Notify({ Title = "Erro", Content = "Nenhuma vela perto. Suba na sua vela.", Duration = 4 })
+        end
+    end
+})
+
+BoatTab:CreateButton({
+    Name = "TP PRA VELA MARCADA",
+    Callback = function()
+        teleportToMarkedSail(true)
+    end
+})
+
+BoatTab:CreateToggle({
+    Name = "Auto TP Vela (vida baixa)",
+    CurrentValue = false,
+    Callback = function(v) Config.AutoTPBoat = v end
+})
+
+BoatTab:CreateSlider({
+    Name = "Vida % para Auto TP",
+    Range = {10, 60},
+    Increment = 5,
+    CurrentValue = 35,
+    Callback = function(v) Config.HealthPercent = v end
+})
+
+-- ==================== ABA PLAYERS ====================
+local PlayerTab = Window:CreateTab("TP Players", 4483362458)
+
+local function getPlayerNames()
+    local list = {}
+    for _, plr in pairs(Players:GetPlayers()) do
+        if not (plr == LocalPlayer) then
+            table.insert(list, plr.Name)
+        end
+    end
+    if #list == 0 then
+        table.insert(list, "Nenhum")
+    end
+    return list
+end
+
+local selectedPlayerName = nil
+
+local PlayerDropdown = PlayerTab:CreateDropdown({
+    Name = "Escolher Player",
+    Options = getPlayerNames(),
+    CurrentOption = {"Nenhum"},
+    Callback = function(opt)
+        if type(opt) == "table" then
+            selectedPlayerName = opt[1]
+        else
+            selectedPlayerName = opt
+        end
+    end
+})
+
+PlayerTab:CreateButton({
+    Name = "Atualizar lista",
+    Callback = function()
+        PlayerDropdown:Refresh(getPlayerNames())
+        Rayfield:Notify({ Title = "Players", Content = "Lista atualizada", Duration = 2 })
+    end
+})
+
+PlayerTab:CreateButton({
+    Name = "Teleportar ate o Player",
+    Callback = function()
+        if not selectedPlayerName or selectedPlayerName == "Nenhum" then
+            Rayfield:Notify({ Title = "Erro", Content = "Escolha um player na lista", Duration = 3 })
+            return
+        end
+
+        local plr = Players:FindFirstChild(selectedPlayerName)
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local target = plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+
+        if root and target then
+            root.CFrame = target.CFrame + Vector3.new(0, 3, 0)
+            Rayfield:Notify({ Title = "TP", Content = "Teleportado ate " .. selectedPlayerName, Duration = 3 })
+        else
+            Rayfield:Notify({ Title = "Erro", Content = "Player sem personagem", Duration = 3 })
+        end
+    end
+})
+
+-- ==================== FUNCOES ====================
+local function isLocalCharacter(model)
+    if not model then return true end
+    if model == LocalPlayer.Character then return true end
+    if LocalPlayer.Character and model:IsDescendantOf(LocalPlayer.Character) then return true end
+    return false
+end
+
+local function isVisible(fromPos, toPos)
+    local dir = toPos - fromPos
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {LocalPlayer.Character}
+    local hit = Workspace:Raycast(fromPos, dir, params)
+    if not hit then return true end
+    return (hit.Position - toPos).Magnitude < 5
+end
+
+local function getClosestNPC()
+    local closest, shortest = nil, Config.AimbotDist
+    local char = LocalPlayer.Character
+    local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+    local myHead = char and char:FindFirstChild("Head")
+    if not myRoot then return nil, 0 end
+
+    local origin = myHead and myHead.Position or myRoot.Position
+
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
+            if not isLocalCharacter(obj) then
+                local isPlayer = false
+                for _, plr in pairs(Players:GetPlayers()) do
+                    if plr.Character == obj then
+                        isPlayer = true
+                        break
+                    end
+                end
+
+                if not isPlayer then
+                    local hum = obj:FindFirstChildOfClass("Humanoid")
+                    if hum and hum.Health > 0 then
+                        local part = obj:FindFirstChild("Head")
+                            or obj:FindFirstChild("HumanoidRootPart")
+                            or obj.PrimaryPart
+                            or obj:FindFirstChildWhichIsA("BasePart")
+
+                        if part then
+                            local dist = (myRoot.Position - part.Position).Magnitude
+                            if dist > 5 and dist < shortest then
+                                local canAim = true
+                                if Config.WallCheck then
+                                    if not isVisible(origin, part.Position) then
+                                        canAim = false
+                                    end
+                                end
+                                if canAim then
+                                    shortest = dist
+                                    closest = part
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return closest, shortest
+end
+
+function teleportToMarkedSail(force)
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not root then
+        Rayfield:Notify({ Title = "Erro", Content = "Sem personagem", Duration = 3 })
+        return
+    end
+
+    if not MarkedSail or not MarkedSail.Parent then
+        MarkedSail = nil
+        SailStatus:Set("Vela marcada: nenhuma")
+        Rayfield:Notify({ Title = "Erro", Content = "Marque sua vela primeiro", Duration = 3 })
+        return
+    end
+
+    local dist = (root.Position - MarkedSail.Position).Magnitude
+    if not force and dist <= Config.BoatMinDist then
+        return
+    end
+
+    root.CFrame = MarkedSail.CFrame + Vector3.new(0, 4, 0)
+    Config.lastBoatTP = tick()
+    Rayfield:Notify({ Title = "TP Vela", Content = "Teleportado na vela marcada", Duration = 3 })
+end
+
+-- ==================== LOOPS ====================
+RunService.RenderStepped:Connect(function()
+    if not Config.Aimbot then
+        AimStatus:Set("Alvo: nenhum")
+        return
+    end
+
+    local target, dist = getClosestNPC()
+    if target then
+        local cam = Camera.CFrame
+        Camera.CFrame = cam:Lerp(CFrame.new(cam.Position, target.Position), Config.AimbotSmooth)
+        local txt = dist <= 35 and "PERTO" or (dist <= 90 and "MEDIO" or "LONGE")
+        AimStatus:Set("Alvo: " .. txt .. " (" .. math.floor(dist) .. "m)")
+    else
+        AimStatus:Set("Alvo: nenhum visivel")
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.7)
+        if Config.AutoTPBoat then
+            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                local pct = (hum.Health / hum.MaxHealth) * 100
+                if pct <= Config.HealthPercent then
+                    if tick() - Config.lastBoatTP > Config.BoatCooldown then
+                        teleportToMarkedSail(false)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+Rayfield:Notify({
+    Title = "Rusty Rafts 2.0",
+    Content = "Tudo desligado. Marque sua vela antes do TP.",
+    Duration = 5
+})
