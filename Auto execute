@@ -1,0 +1,68 @@
+--[[
+    Auto Re-exec - 100 Days At Sea
+    Roda o Baan Hub de novo quando muda Lobby <-> Jogo
+]]
+
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+
+local FARM_URL = "https://raw.githubusercontent.com/fast007x2-blip/baan-hub/main/baan-hub.lua"
+local DELAY = 4          -- espera apos teleportar
+local CHECK = 3          -- verifica PlaceId a cada X seg
+local myGameId = game.GameId
+local lastPlaceId = game.PlaceId
+local busy = false
+
+local function runHub()
+    if busy then return end
+    busy = true
+    task.spawn(function()
+        local ok, err = pcall(function()
+            loadstring(game:HttpGet(FARM_URL))()
+        end)
+        if ok then
+            print("[AutoHub] Baan Hub executado | PlaceId:", game.PlaceId)
+        else
+            warn("[AutoHub] Erro:", err)
+        end
+        task.wait(2)
+        busy = false
+    end)
+end
+
+-- primeira vez
+task.wait(2)
+runHub()
+
+-- quando o PlaceId muda (lobby <-> jogo)
+task.spawn(function()
+    while task.wait(CHECK) do
+        -- saiu deste jogo / outro experience
+        if game.GameId \~= myGameId then
+            print("[AutoHub] Saiu do jogo. Parando.")
+            break
+        end
+
+        if game.PlaceId \~= lastPlaceId then
+            lastPlaceId = game.PlaceId
+            print("[AutoHub] Novo place:", lastPlaceId, "- reexecutando em", DELAY, "s")
+            task.wait(DELAY)
+            if game.GameId == myGameId then
+                runHub()
+            end
+        end
+    end
+end)
+
+-- backup: chegou de teleport
+pcall(function()
+    TeleportService.LocalPlayerArrivedFromTeleport:Connect(function()
+        task.wait(DELAY)
+        if game.GameId == myGameId then
+            lastPlaceId = game.PlaceId
+            runHub()
+        end
+    end)
+end)
+
+print("[AutoHub] Ativo | GameId:", myGameId, "| Place:", lastPlaceId)
