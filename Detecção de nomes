@@ -1,0 +1,94 @@
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local lp = Players.LocalPlayer
+local collected = {}
+
+pcall(function()
+    if CoreGui:FindFirstChild("ScanMTB") then
+        CoreGui.ScanMTB:Destroy()
+    end
+end)
+
+local s = Instance.new("ScreenGui")
+s.Name = "ScanMTB"
+s.Parent = CoreGui
+
+local f = Instance.new("Frame")
+f.Size = UDim2.new(0, 180, 0, 130)
+f.Position = UDim2.new(0.02, 0, 0.4, 0)
+f.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+f.Active = true
+f.Draggable = true
+f.Parent = s
+
+local t = Instance.new("TextLabel")
+t.Size = UDim2.new(1, 0, 0, 26)
+t.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+t.Text = "Scanner MTB"
+t.TextColor3 = Color3.new(1,1,1)
+t.Font = Enum.Font.SourceSansBold
+t.TextSize = 14
+t.Parent = f
+
+local c = Instance.new("TextLabel")
+c.Size = UDim2.new(0.9, 0, 0, 22)
+c.Position = UDim2.new(0.05, 0, 0, 30)
+c.BackgroundTransparency = 1
+c.Text = "Nomes: 0"
+c.TextColor3 = Color3.fromRGB(100, 255, 150)
+c.Font = Enum.Font.SourceSans
+c.TextSize = 14
+c.Parent = f
+
+local b1 = Instance.new("TextButton")
+b1.Size = UDim2.new(0.9, 0, 0, 30)
+b1.Position = UDim2.new(0.05, 0, 0, 55)
+b1.BackgroundColor3 = Color3.fromRGB(40, 90, 160)
+b1.Text = "SCAN PERTO"
+b1.TextColor3 = Color3.new(1,1,1)
+b1.Font = Enum.Font.SourceSansBold
+b1.TextSize = 14
+b1.Parent = f
+
+local b2 = Instance.new("TextButton")
+b2.Size = UDim2.new(0.9, 0, 0, 30)
+b2.Position = UDim2.new(0.05, 0, 0, 92)
+b2.BackgroundColor3 = Color3.fromRGB(0, 140, 60)
+b2.Text = "COPIAR"
+b2.TextColor3 = Color3.new(1,1,1)
+b2.Font = Enum.Font.SourceSansBold
+b2.TextSize = 14
+b2.Parent = f
+
+b1.MouseButton1Click:Connect(function()
+    local root = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+    if not root then
+        c.Text = "Sem personagem"
+        return
+    end
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
+        if part and (root.Position - part.Position).Magnitude < 70 then
+            if obj.Name \~= "" then
+                collected[obj.Name] = true
+            end
+        end
+    end
+    local n = 0
+    for _ in pairs(collected) do n = n + 1 end
+    c.Text = "Nomes: " .. n
+end)
+
+b2.MouseButton1Click:Connect(function()
+    local list = {}
+    for name in pairs(collected) do
+        table.insert(list, name)
+    end
+    table.sort(list)
+    local text = table.concat(list, "\n")
+    pcall(function()
+        setclipboard(text)
+    end)
+    c.Text = "Copiado: " .. #list
+end)
